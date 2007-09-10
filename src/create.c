@@ -1,3 +1,7 @@
+/*
+* create /open
+*/
+
 #include <lklvfs.h>
 
 NTSTATUS LklCreate(PDEVICE_OBJECT device, PIRP irp)

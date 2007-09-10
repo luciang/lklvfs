@@ -1,52 +1,12 @@
+/**
+* driver initialization functions
+**/
+
 #include <lklvfs.h>
 #include<fastio.h>
 
 
 LKLFSD lklfsd;
-
-void linux_kernel_thread(PVOID p)
-{
-	/*NTSTATUS status=STATUS_SUCCESS;
-	struct linux_native_operations lnops;
-	RtlZeroMemory(&lnops, sizeof(struct linux_native_operations));
-	lnops.panic_blink=linux_panic_blink;
-	lnops.mem_init=linux_mem_init;
-	lnops.main=linux_main;
-	threads_init(&lnops);
-
-	__try
-	{
-		DbgPrint("Start linux kernel");
-		linux_start_kernel(&lnops, "root=%d:0", FILE_DISK_MAJOR);
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-		{
-			status = GetExceptionCode();
-		}
-		if(!NT_SUCCESS(status))
-			DbgPrint("Exception %x in starting linux kernel", status);
-	*/
-}
-
-void unload_linux_kernel()
-{
-	//TODO - cleanup the mess
-
-	// and finally...
-	//ZwClose(lklfsd.linux_thread);
-}
-
-NTSTATUS run_linux_kernel()
-{
-	NTSTATUS status=STATUS_SUCCESS;
-	//status = PsCreateSystemThread(&lklfsd.linux_thread, (ACCESS_MASK)0L,
-	//			NULL, NULL, NULL, &linux_kernel_thread, NULL);
-
-	return status;
-
-}
-
-
 
 NTSTATUS DriverEntry(PDRIVER_OBJECT driver, PUNICODE_STRING reg_path)
 {
@@ -100,8 +60,10 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT driver, PUNICODE_STRING reg_path)
 void InitializeFunctionPointers(PDRIVER_OBJECT driver)
 {
 	driver->DriverUnload = LklDriverUnload;
+	// TODO -functions that MUST be supported
 	driver->MajorFunction[IRP_MJ_FILE_SYSTEM_CONTROL] = LklFileSystemControl;
-	// TODO - these functions must be supported
+	driver->MajorFunction[IRP_MJ_QUERY_VOLUME_INFORMATION] = LklQueryVolumeInformation;
+	driver->MajorFunction[IRP_MJ_DEVICE_CONTROL] = LklDeviceControl;
 	driver->MajorFunction[IRP_MJ_CREATE] = LklCreate;
 	driver->MajorFunction[IRP_MJ_CLOSE]	= LklClose;
 	driver->MajorFunction[IRP_MJ_CLEANUP] = LklDummyIrp;
@@ -110,9 +72,7 @@ void InitializeFunctionPointers(PDRIVER_OBJECT driver)
 	driver->MajorFunction[IRP_MJ_WRITE] =LklDummyIrp;
 	driver->MajorFunction[IRP_MJ_QUERY_INFORMATION] = LklDummyIrp;
 	driver->MajorFunction[IRP_MJ_SET_INFORMATION] = LklDummyIrp;
-	driver->MajorFunction[IRP_MJ_QUERY_VOLUME_INFORMATION] = LklDummyIrp;
 	// these functions are optional
-	driver->MajorFunction[IRP_MJ_DEVICE_CONTROL] = LklDeviceControl;
 	driver->MajorFunction[IRP_MJ_FLUSH_BUFFERS] = LklDummyIrp;
 	driver->MajorFunction[IRP_MJ_SET_VOLUME_INFORMATION] = LklDummyIrp;
 	driver->MajorFunction[IRP_MJ_SHUTDOWN] = LklDummyIrp;

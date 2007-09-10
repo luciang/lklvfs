@@ -1,3 +1,6 @@
+/*
+* close & it's friends
+*/
 #include <lklvfs.h>
 
 NTSTATUS LklClose(PDEVICE_OBJECT device, PIRP irp)

@@ -89,8 +89,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT driver, PUNICODE_STRING reg_path);
 void InitializeFunctionPointers(PDRIVER_OBJECT driver);
 void InitializeFastIO(PDRIVER_OBJECT driver);
 VOID LklDriverUnload(PDRIVER_OBJECT driver);
-NTSTATUS run_linux_kernel();
-void unload_linux_kernel();
 
 /* fscontrol.c */
 NTSTATUS LklFileSystemControl(PDEVICE_OBJECT device, PIRP irp);
@@ -110,7 +108,6 @@ NTSTATUS LklUmount(PDEVICE_OBJECT dev, PFILE_OBJECT file);
 NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb);
 
 /* devcontrol.c */
-
 NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp);
 
 /* alloc.c */
@@ -127,6 +124,12 @@ NTSTATUS LklCreate(PDEVICE_OBJECT device, PIRP irp);
 /* misc.c */
 void LklCompleteRequest(PIRP irp, NTSTATUS status);
 NTSTATUS LklDummyIrp(PDEVICE_OBJECT dev_obj, PIRP irp);
+BOOLEAN LklIsIrpTopLevel(PIRP irp);
+VOID CharToWchar(PWCHAR Destination, PCHAR Source, ULONG Length);
+NTSTATUS run_linux_kernel();
+void unload_linux_kernel();
 
+/* geninfo.c */
+NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT dev_obj, PIRP irp);
 
 #endif

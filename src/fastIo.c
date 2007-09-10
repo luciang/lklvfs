@@ -1,3 +1,7 @@
+/**
+* Fast I/O support
+**/
+
 #include <fastio.h>
 
 BOOLEAN LklFastIoCheckIfPossible (

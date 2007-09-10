@@ -8,4 +8,4 @@ DRIVERTYPE=FS
 
 INCLUDES = ..\inc;$(BASEDIR)\inc\ifs\wnet
 
-SOURCES = init.c fscontrol.c devcontrol.c misc.c alloc.c create.c close.c fastIo.c
+SOURCES = init.c fscontrol.c devcontrol.c misc.c alloc.c create.c close.c fastIo.c geninfo.c

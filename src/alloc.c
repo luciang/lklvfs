@@ -1,3 +1,7 @@
+/**
+* allocation related stuff
+**/
+
 #include<lklvfs.h>
 
 void LklCreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
