@@ -112,7 +112,7 @@ void InitializeFunctionPointers(PDRIVER_OBJECT driver)
 	driver->MajorFunction[IRP_MJ_SET_INFORMATION] = LklDummyIrp;
 	driver->MajorFunction[IRP_MJ_QUERY_VOLUME_INFORMATION] = LklDummyIrp;
 	// these functions are optional
-	driver->MajorFunction[IRP_MJ_DEVICE_CONTROL] = LklDummyIrp;
+	driver->MajorFunction[IRP_MJ_DEVICE_CONTROL] = LklDeviceControl;
 	driver->MajorFunction[IRP_MJ_FLUSH_BUFFERS] = LklDummyIrp;
 	driver->MajorFunction[IRP_MJ_SET_VOLUME_INFORMATION] = LklDummyIrp;
 	driver->MajorFunction[IRP_MJ_SHUTDOWN] = LklDummyIrp;

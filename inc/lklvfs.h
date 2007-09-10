@@ -109,6 +109,10 @@ NTSTATUS LklVerifyVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
 NTSTATUS LklUmount(PDEVICE_OBJECT dev, PFILE_OBJECT file);
 NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb);
 
+/* devcontrol.c */
+
+NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp);
+
 /* alloc.c */
 void LklCreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 					  PLARGE_INTEGER alloc_size);
