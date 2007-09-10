@@ -53,6 +53,34 @@ typedef struct lkl_vcb
 
 } LKLVCB, * PLKLVCB;
 
+typedef struct lkl_fcb
+{
+	PLKLVCB						vcb;				// vcb we belong to
+	LIST_ENTRY					next;				// next open fcb in vcb
+	ULONG						flags;				// flag
+	LIST_ENTRY					ccb_list;			// head of ccb list
+	SHARE_ACCESS				share_access;		// share access
+	ULONG						reference_count;	// references to this fcb
+	ULONG						handle_count;		// open handles to this file
+	LARGE_INTEGER				creation_time;		// some times kept here for easier access
+	LARGE_INTEGER				lastaccess_time;
+	LARGE_INTEGER				lastwrite_time;
+	// more fields here
+
+} LKLFCB, * PLKLFCB;
+
+typedef struct lkl_ccb
+{
+	PLKLFCB					fcb;			// fcb we belong to
+	LIST_ENTRY				next;			// next ccb in list of ccbs belonging to this fcb
+	PFILE_OBJECT			file_obj;		// file obj representing this open file
+	ULONG					flags;			// flags
+	LARGE_INTEGER			offset;			// current pointer offest
+	UNICODE_STRING			search_pattern;	// search pattern if this file is a dir
+	ULONG					user_time;		// maintain time for user specified time
+	//more fields here
+
+} LKLCCB, * PLKLCCB;
 
 
 /* init.c */
@@ -69,8 +97,8 @@ NTSTATUS LklFileSystemControl(PDEVICE_OBJECT device, PIRP irp);
 NTSTATUS LklMountVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
 NTSTATUS LklUserFileSystemRequest(PIRP irp, PIO_STACK_LOCATION stack_location);
 NTSTATUS LklLockVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
+void LklPurgeFile(PLKLFCB fcb, BOOLEAN flush_before_purge);
 void LklPurgeVolume(PLKLVCB vcb, BOOLEAN flush_before_purge);
-
 void LklSetVpbFlag(PVPB vpb, USHORT flag);
 void LklClearVpbFlag(PVPB vpb, USHORT flag);
 NTSTATUS LklUnlockVolume(PIRP irp, PIO_STACK_LOCATION stack_location);

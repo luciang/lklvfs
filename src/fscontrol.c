@@ -150,7 +150,14 @@ NTSTATUS LklLockVolume(PIRP irp, PIO_STACK_LOCATION stack_location)
 	return status;
 }
 
+void LklPurgeFile(PLKLFCB fcb, BOOLEAN flush_before_purge)
+{
+	IO_STATUS_BLOCK iosb;
 
+	ASSERT(fcb);
+	DbgPrint("Purge files");
+	//TODO
+}
 
 //
 //	purges any files that are still referenced, most probably by the cache mgr
