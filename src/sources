@@ -1,0 +1,11 @@
+TARGETNAME = lklvfs
+
+TARGETPATH = ..\sys
+
+TARGETTYPE = DRIVER
+
+DRIVERTYPE=FS
+
+INCLUDES = ..\inc;$(BASEDIR)\inc\ifs\wnet
+
+SOURCES = init.c fscontrol.c misc.c alloc.c create.c close.c fastIo.c
