@@ -13,6 +13,9 @@ void LklCreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb
 	vcb = (PLKLVCB)(volume_dev->DeviceExtension);
 	RtlZeroMemory(vcb, sizeof(LKLVCB));
 
+	vcb->id.type = VCB;
+	vcb->id.size = sizeof(LKLVCB);
+
 	status = ExInitializeResourceLite(&(vcb->vcb_resource));
 	ASSERT(NT_SUCCESS(status));
 
@@ -50,5 +53,3 @@ void LklFreeVcb(PLKLVCB vcb)
 
 	IoDeleteDevice(vcb->vcb_device);
 }
-
-

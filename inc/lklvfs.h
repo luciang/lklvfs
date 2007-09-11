@@ -21,17 +21,25 @@
 #define	IOCTL_PREPARE_TO_UNLOAD \
 		CTL_CODE(FILE_DEVICE_UNKNOWN, 2048, METHOD_NEITHER, FILE_WRITE_ACCESS)
 
+// used for identifier
+typedef enum _IDENTIFIER_TYPE
+{
+	VCB = ':BCV',
+	FCB = ':BCF',
+	CCB = ':BCC',
+} IDENTIFIER_TYPE;
+
 typedef struct lkl_fsd {
 	ERESOURCE				global_resource;
 	PDRIVER_OBJECT			driver;
-	PDEVICE_OBJECT			device;
+	PDEVICE_OBJECT			device;		// fs device
 	ULONG					flags;
-	LIST_ENTRY				vcb_list;
+	LIST_ENTRY				vcb_list;	// head of mounted volume list
 
 	FAST_IO_DISPATCH		fast_io_dispatch;
 	CACHE_MANAGER_CALLBACKS	cache_mgr_callbacks;
 // temporary use:
-	PDEVICE_OBJECT			physical_device;
+	PDEVICE_OBJECT			physical_device; // current mounted device
 	HANDLE					linux_thread;
 	PVOID					mem_zone;
 } LKLFSD;
@@ -46,29 +54,46 @@ extern LKLFSD lklfsd;
 #define	VFS_VCB_FLAGS_VOLUME_READ_ONLY	0x00000010
 #define	VFS_VCB_FLAGS_VCB_INITIALIZED	0x00000020
 
+// identifier used for each defined data structure
+typedef struct lklvfs_identifier {
+	ULONG	type;
+	ULONG	size;
+} LKLVFSID;
+
+
 typedef struct lkl_vcb
 {
-	FSRTL_COMMON_FCB_HEADER	common_header;
+	// required header - this vcb is used as fcb for volume open/close, etc.
+	FSRTL_COMMON_FCB_HEADER		common_header;
+	SECTION_OBJECT_POINTERS		section_object;
+	ERESOURCE					vcb_resource;
+	ERESOURCE					paging_resource;
 
-	SECTION_OBJECT_POINTERS	section_object;
-	ERESOURCE				vcb_resource;
-	LIST_ENTRY				next;					// next mounted vcb
-	PVPB					vpb;					// vpb
-	ULONG					open_count;				// how many open handles for files in this volume
-	ULONG					reference_count;		// how many files referenced in this volume
-	LIST_ENTRY				fcb_list;				// head of open files list
-	LIST_ENTRY				next_notify_irp;		// used for direrctory notification
-	KMUTEX					notify_irp_mutex;
-	ULONG					flags;
-	PDEVICE_OBJECT			vcb_device;				// the volume device object
-	PDEVICE_OBJECT			target_device;			// the physical device object
-	UCHAR					*volume_path;			// volume path
+	LKLVFSID					id;						// this tells that i'm a vcb
+	LIST_ENTRY					next;					// next mounted vcb
+	PVPB						vpb;					// vpb
+	ULONG						open_count;				// how many open handles for files in this volume
+	ULONG						reference_count;		// how many files referenced in this volume
+	LIST_ENTRY					fcb_list;				// head of open files list
+	LIST_ENTRY					next_notify_irp;		// used for direrctory notification
+	KMUTEX						notify_irp_mutex;
+	ULONG						flags;
+	PDEVICE_OBJECT				vcb_device;				// the volume device object
+	PDEVICE_OBJECT				target_device;			// the physical device object
+	UCHAR						*volume_path;			// volume path
 	//more fields here
 
 } LKLVCB, * PLKLVCB;
 
 typedef struct lkl_fcb
 {
+	// required header
+	FSRTL_COMMON_FCB_HEADER		common_header;
+	SECTION_OBJECT_POINTERS		section_object;
+	ERESOURCE					fcb_resource;
+	ERESOURCE					paging_resource;
+
+	LKLVFSID					id;					// this tells that i'm a fcb
 	PLKLVCB						vcb;				// vcb we belong to
 	LIST_ENTRY					next;				// next open fcb in vcb
 	ULONG						flags;				// flag
@@ -85,6 +110,7 @@ typedef struct lkl_fcb
 
 typedef struct lkl_ccb
 {
+	LKLVFSID				id;				// i'm a ccb
 	PLKLFCB					fcb;			// fcb we belong to
 	LIST_ENTRY				next;			// next ccb in list of ccbs belonging to this fcb
 	PFILE_OBJECT			file_obj;		// file obj representing this open file

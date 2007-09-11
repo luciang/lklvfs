@@ -1,5 +1,5 @@
 /**
-* usefull functions
+* useful functions
 **/
 
 #include<lklvfs.h>
