@@ -19,6 +19,6 @@ NTSTATUS LklCreate(PDEVICE_OBJECT device, PIRP irp)
 		return STATUS_SUCCESS;
 	}
 	// TODO
-
-	return STATUS_ACCESS_DENIED;
+	LklCompleteRequest(irp,STATUS_SUCCESS);
+	return STATUS_SUCCESS;
 }

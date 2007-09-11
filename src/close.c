@@ -5,19 +5,23 @@
 
 NTSTATUS LklClose(PDEVICE_OBJECT device, PIRP irp)
 {
+	PLKLVCB vcb;
+
 	ASSERT(device);
 	ASSERT(irp);
 	DbgPrint("CLOSE REQUEST");
-	if(device == lklfsd.device)
-	{
+
+	if(device == lklfsd.device) {
 		FsRtlEnterFileSystem();
 		IoCompleteRequest(irp, IO_DISK_INCREMENT);
 		FsRtlExitFileSystem();
-		IoUnregisterFileSystem(lklfsd.device);
-		IoDeleteDevice(lklfsd.device);
+
 		return STATUS_SUCCESS;
 	}
-	//TODO
 
-	return STATUS_ACCESS_DENIED;
+	vcb=(PLKLVCB) device->DeviceExtension;
+	ASSERT(vcb);
+	//TODO
+	LklCompleteRequest(irp, STATUS_SUCCESS);
+	return STATUS_SUCCESS;
 }

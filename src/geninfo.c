@@ -123,7 +123,7 @@ NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 						irp->IoStatus.Information =
 							sizeof(FILE_FS_ATTRIBUTE_INFORMATION);
 						status = STATUS_BUFFER_OVERFLOW;
-						DbgPrint("FileFsAttributeInformation\n");
+						DbgPrint("FileFsAttributeInformation");
 						__leave;
 					}
 					CharToWchar(Buffer->FileSystemName, TEMP_FS_NAME,TEMP_FS_LENGTH);

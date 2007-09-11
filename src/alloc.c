@@ -35,6 +35,7 @@ void LklCreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb
 	ExAcquireResourceExclusiveLite(&(lklfsd.global_resource), TRUE);
 	InsertTailList(&(lklfsd.vcb_list), &(vcb->next));
 	RELEASE(&(lklfsd.global_resource));
+	SET_FLAG(vcb->flags, VFS_VCB_FLAGS_VCB_INITIALIZED);
 }
 
 void LklFreeVcb(PLKLVCB vcb)

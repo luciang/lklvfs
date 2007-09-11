@@ -15,23 +15,36 @@
 #define CLEAR_FLAG(flag, val)	((flag)&=~(val))
 #define RELEASE(res) (ExReleaseResourceForThreadLite((res), ExGetCurrentResourceThread()))
 #define	QUAD_ALIGN(val)			((((ULONG)(val))+7)&0xfffffff8)
+#define TRY_RETURN(S)			{status=S;goto try_exit;}
+
+#define VFS_UNLOAD_PENDING					0x00000001
+#define	IOCTL_PREPARE_TO_UNLOAD \
+		CTL_CODE(FILE_DEVICE_UNKNOWN, 2048, METHOD_NEITHER, FILE_WRITE_ACCESS)
 
 typedef struct lkl_fsd {
 	ERESOURCE				global_resource;
 	PDRIVER_OBJECT			driver;
 	PDEVICE_OBJECT			device;
-	// use it for now:
-	PDEVICE_OBJECT			physical_device;
+	ULONG					flags;
 	LIST_ENTRY				vcb_list;
 
 	FAST_IO_DISPATCH		fast_io_dispatch;
 	CACHE_MANAGER_CALLBACKS	cache_mgr_callbacks;
-
+// temporary use:
+	PDEVICE_OBJECT			physical_device;
 	HANDLE					linux_thread;
 	PVOID					mem_zone;
 } LKLFSD;
 
 extern LKLFSD lklfsd;
+
+// vcb flags
+#define VFS_VCB_FLAGS_VOLUME_MOUNTED	0x00000001
+#define	VFS_VCB_FLAGS_VOLUME_LOCKED		0x00000002
+#define	VFS_VCB_FLAGS_BEING_DISMOUNTED	0x00000004
+#define	VFS_VCB_FLAGS_SHUTDOWN			0x00000008
+#define	VFS_VCB_FLAGS_VOLUME_READ_ONLY	0x00000010
+#define	VFS_VCB_FLAGS_VCB_INITIALIZED	0x00000020
 
 typedef struct lkl_vcb
 {
@@ -45,7 +58,8 @@ typedef struct lkl_vcb
 	ULONG					reference_count;		// how many files referenced in this volume
 	LIST_ENTRY				fcb_list;				// head of open files list
 	LIST_ENTRY				next_notify_irp;		// used for direrctory notification
-	KMUTEX					notify_irp_mutex;		//
+	KMUTEX					notify_irp_mutex;
+	ULONG					flags;
 	PDEVICE_OBJECT			vcb_device;				// the volume device object
 	PDEVICE_OBJECT			target_device;			// the physical device object
 	UCHAR					*volume_path;			// volume path
@@ -126,6 +140,7 @@ void LklCompleteRequest(PIRP irp, NTSTATUS status);
 NTSTATUS LklDummyIrp(PDEVICE_OBJECT dev_obj, PIRP irp);
 BOOLEAN LklIsIrpTopLevel(PIRP irp);
 VOID CharToWchar(PWCHAR Destination, PCHAR Source, ULONG Length);
+void LklVfsReportError(const char * string);
 NTSTATUS run_linux_kernel();
 void unload_linux_kernel();
 

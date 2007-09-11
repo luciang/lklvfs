@@ -19,7 +19,8 @@ void LklCompleteRequest(PIRP irp, NTSTATUS status)
 		if (NT_ERROR(status) && FLAG_ON(irp->Flags, IRP_INPUT_OPERATION))
 			irp->IoStatus.Information = 0;
 		irp->IoStatus.Status = status;
-		IoCompleteRequest(irp, IO_DISK_INCREMENT);
+
+		IoCompleteRequest(irp, NT_SUCCESS(status) ? IO_DISK_INCREMENT : IO_NO_INCREMENT);
 	}
 	return;
 }
@@ -58,6 +59,14 @@ VOID CharToWchar(PWCHAR Destination, PCHAR Source, ULONG Length)
 		Destination[Index] = (WCHAR)Source[Index];
 	}
 }
+
+void LklVfsReportError(const char * string)
+{
+	//todo - make a nice log entry (but for now we stick with DbgPrint)
+
+	DbgPrint("****%s****",string);
+}
+
 
 void linux_kernel_thread(PVOID p)
 {
