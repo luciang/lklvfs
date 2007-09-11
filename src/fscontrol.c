@@ -302,6 +302,12 @@ NTSTATUS LklUmount(IN PDEVICE_OBJECT dev,IN PFILE_OBJECT file)
 	status=STATUS_SUCCESS;
 	//TODO unmount volume  ( linux way )
 	// status=...
+	if (!FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VOLUME_LOCKED)) {
+			LklVfsReportError("Volume is NOT LOCKED");
+			return(STATUS_ACCESS_DENIED);
+		}
+
+	SET_FLAG(vcb->flags, VFS_VCB_FLAGS_BEING_DISMOUNTED);
 	if (vcb_acquired)
 			RELEASE(&vcb->vcb_resource);
 	if (!NT_SUCCESS(status) && notified)

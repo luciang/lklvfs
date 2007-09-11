@@ -163,6 +163,7 @@ NTSTATUS LklCreate(PDEVICE_OBJECT device, PIRP irp);
 
 /* misc.c */
 void LklCompleteRequest(PIRP irp, NTSTATUS status);
+NTSTATUS LklPostRequest(PIRP irp);
 NTSTATUS LklDummyIrp(PDEVICE_OBJECT dev_obj, PIRP irp);
 BOOLEAN LklIsIrpTopLevel(PIRP irp);
 VOID CharToWchar(PWCHAR Destination, PCHAR Source, ULONG Length);

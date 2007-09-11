@@ -25,6 +25,17 @@ void LklCompleteRequest(PIRP irp, NTSTATUS status)
 	return;
 }
 
+NTSTATUS LklPostRequest(PIRP irp)
+{
+	NTSTATUS status = STATUS_PENDING;
+
+	//IoMarkIrpPending(irp);
+	//TODO -- insert the irp in the queue so that it can be processed later
+
+	LklCompleteRequest(irp, STATUS_UNSUCCESSFUL);
+	return STATUS_UNSUCCESSFUL;
+}
+
 NTSTATUS LklDummyIrp(PDEVICE_OBJECT dev_obj, PIRP irp)
 {
 	BOOLEAN top_level = FALSE;
