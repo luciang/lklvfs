@@ -18,19 +18,25 @@ NTSTATUS LklClose(PDEVICE_OBJECT device, PIRP irp)
 	ASSERT(irp);
 	DbgPrint("CLOSE REQUEST");
 
-	if(device == lklfsd.device) {
-		// never fail for fs device
-		FsRtlEnterFileSystem();
-		LklCompleteRequest(irp,STATUS_SUCCESS);
-		FsRtlExitFileSystem();
+	FsRtlEnterFileSystem();
 
-		return STATUS_SUCCESS;
-	}
-	// not fs device
 	__try {
+		ASSERT(device);
+		ASSERT(irp);
 		vcb=(PLKLVCB) device->DeviceExtension;
 		ASSERT(vcb);
+		// make shure we have a vcb here
 		ASSERT(vcb->id.type == VCB && vcb->id.size == sizeof(LKLVCB));
+
+		// not fs device
+		if(device == lklfsd.device) {
+			// never fail for fs device
+			LklCompleteRequest(irp,STATUS_SUCCESS);
+			FsRtlExitFileSystem();
+
+			TRY_RETURN(STATUS_SUCCESS);
+		}
+
 		// cannot block in close
 		if (!ExAcquireResourceExclusiveLite(&vcb->vcb_resource, FALSE)) {
 				postRequest = TRUE;
@@ -55,6 +61,7 @@ NTSTATUS LklClose(PDEVICE_OBJECT device, PIRP irp)
 			DbgPrint("VOLUME CLOSE");
 			vcb->reference_count--;
 			if (!vcb->reference_count && FLAG_ON(vcb->flags, VFS_VCB_FLAGS_BEING_DISMOUNTED)) {
+				DbgPrint("Delete Volume");
 				freeVcb = TRUE;
 			}
 			TRY_RETURN(STATUS_SUCCESS);
@@ -77,5 +84,6 @@ try_exit:
 				LklFreeVcb(vcb);
 			}
 	}
-	return STATUS_SUCCESS;
+	FsRtlExitFileSystem();
+	return status;
 }

@@ -4,6 +4,7 @@
 
 #include <lklvfs.h>
 
+NTSTATUS LklIoctlCompletion(PDEVICE_OBJECT device, PIRP irp, PVOID context);
 NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp);
 
 NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp)
@@ -13,33 +14,66 @@ NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 	ULONG ioctl = 0;
 	PIO_STACK_LOCATION stack_location = NULL;
 	PIO_STACK_LOCATION next_stack_location = NULL;
+	BOOLEAN complete_request = FALSE;
+	PLKLVCB vcb = NULL;
+	PLKLFCB fcb = NULL;
+	PFILE_OBJECT file = NULL;
+	PDEVICE_OBJECT targetDevice = NULL;
 
 	ASSERT(device);
 	ASSERT(irp);
-
-	DbgPrint("Device Control");
-	FsRtlEnterFileSystem();
 	top_level = LklIsIrpTopLevel(irp);
+
+	FsRtlEnterFileSystem();
+
 	__try {
+
+		if (device == lklfsd.device) {
+		complete_request = TRUE;
+		TRY_RETURN(STATUS_INVALID_DEVICE_REQUEST);
+		}
+
 		stack_location = IoGetCurrentIrpStackLocation(irp);
 		ASSERT(stack_location);
 
 		ioctl = stack_location->Parameters.DeviceIoControl.IoControlCode;
 
 		if (ioctl == IOCTL_PREPARE_TO_UNLOAD) {
+			complete_request = TRUE;
+			DbgPrint("Prepare to unload");
 			status = LklPrepareToUnload(device,irp);
-			__leave;
+			TRY_RETURN(status);
 		}
-		//for now we support only prepare_unload
-		status = STATUS_SUCCESS;
+
+		file = stack_location->FileObject;
+		ASSERT(file);
+		fcb = (PLKLFCB) file->FsContext;
+		ASSERT(fcb);
+
+		if (fcb->id.type == VCB) {
+			DbgPrint("Device Control");
+			vcb = (PLKLVCB) fcb;
+		} else {
+			vcb = fcb->vcb;
+		}
+		ASSERT(vcb);
+
+		targetDevice = vcb->target_device;
+
+		// Pass on the IOCTL to the driver below
+		complete_request = FALSE;
+		IoSetCompletionRoutine(irp, LklIoctlCompletion, NULL, TRUE, TRUE, TRUE);
+		status = IoCallDriver(targetDevice, irp);
+
+try_exit:
+		;
 	}
-	__except(EXCEPTION_EXECUTE_HANDLER) {
-			status = GetExceptionCode();
-			DbgPrint("Exception %x in device control function", status);
-		}
-	LklCompleteRequest(irp, status);
+	__finally {
+		if(complete_request)
+			LklCompleteRequest(irp, status);
+	}
 	if (top_level)
-		IoSetTopLevelIrp(NULL);
+			IoSetTopLevelIrp(NULL);
 
 	FsRtlExitFileSystem();
 
