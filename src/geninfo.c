@@ -152,3 +152,4 @@ NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 
 	return status;
 }
+

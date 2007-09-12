@@ -37,28 +37,25 @@ NTSTATUS LklCreate(PDEVICE_OBJECT device, PIRP irp)
 	BOOLEAN						ignoreCaseWhenChecking = FALSE;
 	UNICODE_STRING				targetObjectName;
 	UNICODE_STRING				relatedObjectName;
-	UNICODE_STRING				absolutePathName;
-	UNICODE_STRING				renameLinkTargetFileName;
 
 	PLKLFCB						fcb;
 	PLKLCCB						ccb;
 	PLKLVCB						vcb;
 
-	ASSERT(device);
-	ASSERT(irp);
 	DbgPrint("OPEN REQUEST");
 
 	FsRtlEnterFileSystem();
 	// open on fs device
-	if (device == lklfsd.device) {
-		irp->IoStatus.Status = STATUS_SUCCESS;
-		irp->IoStatus.Information = FILE_OPENED;
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
-		FsRtlExitFileSystem();
-		return STATUS_SUCCESS;
-	}
-	//try open/create on volume or file
 	__try {
+		ASSERT(device);
+		ASSERT(irp);
+
+		if (device == lklfsd.device) {
+			irp->IoStatus.Status = STATUS_SUCCESS;
+			irp->IoStatus.Information = FILE_OPENED;
+			TRY_RETURN(STATUS_SUCCESS);
+		}
+
 		irpSp = IoGetCurrentIrpStackLocation(irp);
 		ASSERT(irpSp);
 
@@ -69,7 +66,10 @@ NTSTATUS LklCreate(PDEVICE_OBJECT device, PIRP irp)
 
 		if (relatedFile) {
 			ccb = (PLKLCCB)(relatedFile->FsContext2);
+			ASSERT(ccb);
 			fcb = (PLKLFCB)(relatedFile->FsContext);
+			ASSERT(fcb);
+			ASSERT(fcb->id.type == FCB || fcb->id.type == VCB);
 			relatedObjectName = relatedFile->FileName;
 		}
 		// TODO -- check file size
@@ -97,6 +97,8 @@ NTSTATUS LklCreate(PDEVICE_OBJECT device, PIRP irp)
 		ignoreCaseWhenChecking = ((irpSp->Flags & SL_CASE_SENSITIVE) ? TRUE : FALSE);
 
 		vcb = (PLKLVCB)(device->DeviceExtension);
+		ASSERT(vcb);
+		ASSERT(vcb->id.type == VCB);
 		if (!file->Vpb) {
 			file->Vpb = vcb->vpb;
 		}
@@ -108,18 +110,20 @@ NTSTATUS LklCreate(PDEVICE_OBJECT device, PIRP irp)
 		// if the volume has been locked, fail the request
 		CHECK_OUT(vcb->flags & VFS_VCB_FLAGS_VOLUME_LOCKED, STATUS_ACCESS_DENIED);
 		// check if it's a volume open request
+
 		if ((file->FileName.Length == 0) && ((relatedFile == NULL) ||
 			(fcb->id.type == VCB)))
 		{
-			CHECK_OUT(openTargetDirectory||extAttrBuffer, STATUS_INVALID_PARAMETER);
+			CHECK_OUT(openTargetDirectory || extAttrBuffer, STATUS_INVALID_PARAMETER);
 			CHECK_OUT(directoryOnlyRequested, STATUS_NOT_A_DIRECTORY);
-			CHECK_OUT((requestedDisposition!=FILE_OPEN)&&(requestedDisposition!=FILE_OPEN_IF),
+			CHECK_OUT((requestedDisposition != FILE_OPEN) && (requestedDisposition != FILE_OPEN_IF),
 				STATUS_ACCESS_DENIED);
+
 			file->FsContext = vcb;
 			vcb->reference_count++;
 			irp->IoStatus.Information = FILE_OPENED;
 			DbgPrint("VOLUME OPEN");
-			__leave;
+			TRY_RETURN(STATUS_SUCCESS);
 		}
 
 		// TODO -- more to do here

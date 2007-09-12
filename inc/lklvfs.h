@@ -155,6 +155,9 @@ void LklCreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb
 					  PLARGE_INTEGER alloc_size);
 void LklFreeVcb(PLKLVCB vcb);
 
+/* cleanup.c */
+NTSTATUS LklCleanup(PDEVICE_OBJECT device, PIRP irp);
+
 /* close.c */
 NTSTATUS LklClose(PDEVICE_OBJECT device, PIRP irp);
 
@@ -173,5 +176,6 @@ void unload_linux_kernel();
 
 /* geninfo.c */
 NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT dev_obj, PIRP irp);
+
 
 #endif
