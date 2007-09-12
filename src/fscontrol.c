@@ -48,7 +48,7 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 	NTSTATUS status;
 	PDEVICE_OBJECT volume_device=NULL;
 	LARGE_INTEGER AllocationSize;
-
+	USHORT root_ino;
 	DbgPrint("Mount volume");
 	// fix this - for now we allow only one mounted fs at a time
 	__try{
@@ -60,7 +60,7 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 		//status = run_linux_kernel(); // if this fails, then we fail to mount the volume
 		// CHECK_OUT(!NT_SUCCESS(status), STATUS_UNRECOGNIZED_VOLUME);
 		// if this succeeds...
-		status = IoCreateDevice(lklfsd.driver, QUAD_ALIGN(sizeof(LKLVCB)), NULL,
+		status = IoCreateDevice(lklfsd.driver, sizeof(LKLVCB), NULL,
 				FILE_DEVICE_DISK_FILE_SYSTEM, 0, FALSE, &volume_device);
 		CHECK_OUT(!NT_SUCCESS(status), status);
 		if (dev->AlignmentRequirement > volume_device->AlignmentRequirement)
@@ -69,7 +69,12 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 		volume_device->StackSize = (CCHAR)(dev->StackSize+1);
 
 		vpb->DeviceObject = volume_device;
-		// complete vpb fields from sb fields --TODO--
+		// complete vpb fields from ?? --TODO--
+		#define UNKNOWN_LABEL "unknown_label"
+		CharToWchar(vpb->VolumeLabel, UNKNOWN_LABEL , sizeof(UNKNOWN_LABEL));
+		vpb->VolumeLabel[sizeof(UNKNOWN_LABEL)] = 0;
+		vpb->VolumeLabelLength = sizeof(UNKNOWN_LABEL)*2;
+		vpb->SerialNumber = 0xEF53;
 
 		LklCreateVcb(volume_device,dev,vpb,&AllocationSize);
 try_exit:

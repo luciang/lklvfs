@@ -22,8 +22,8 @@ NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 
 	ASSERT(device);
 	ASSERT(irp);
+	DbgPrint("Device Control");
 	top_level = LklIsIrpTopLevel(irp);
-
 	FsRtlEnterFileSystem();
 
 	__try {
@@ -68,13 +68,16 @@ NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 try_exit:
 		;
 	}
-	__finally {
-		if(complete_request)
-			LklCompleteRequest(irp, status);
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		status = GetExceptionCode();
+		if(!NT_SUCCESS(status))
+			DbgPrint("device control: Exception %x ", status);
 	}
+	if(complete_request)
+		LklCompleteRequest(irp, status);
 	if (top_level)
 			IoSetTopLevelIrp(NULL);
-
 	FsRtlExitFileSystem();
 
 	return status;

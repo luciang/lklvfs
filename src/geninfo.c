@@ -6,13 +6,13 @@
 
 #define SECTOR_SIZE 512
 #define TEMP_FS_NAME "LKLVFS"
-#define TEMP_FS_LENGTH 3
+#define TEMP_FS_LENGTH 6
 
 NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	PLKLVCB vcb = NULL;
-	PIO_STACK_LOCATION IrpSp = NULL;
+	PIO_STACK_LOCATION stack_location = NULL;
 	FS_INFORMATION_CLASS FsInformationClass;
 	ULONG Length;
 	PVOID SystemBuffer;
@@ -30,9 +30,9 @@ NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 		CHECK_OUT(!ExAcquireResourceSharedLite(&vcb->vcb_resource, TRUE),STATUS_PENDING);
 			VcbResourceAcquired = TRUE;
 
-		IrpSp = IoGetCurrentIrpStackLocation(irp);
-		FsInformationClass = IrpSp->Parameters.QueryVolume.FsInformationClass;
-		Length = IrpSp->Parameters.QueryVolume.Length;
+		stack_location = IoGetCurrentIrpStackLocation(irp);
+		FsInformationClass = stack_location->Parameters.QueryVolume.FsInformationClass;
+		Length = stack_location->Parameters.QueryVolume.Length;
 		SystemBuffer = irp->AssociatedIrp.SystemBuffer;
 		RtlZeroMemory(SystemBuffer, Length);
 		// TODO -- make a statfs here!

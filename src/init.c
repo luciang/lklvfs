@@ -64,9 +64,9 @@ void InitializeFunctionPointers(PDRIVER_OBJECT driver)
 	driver->MajorFunction[IRP_MJ_FILE_SYSTEM_CONTROL] = LklFileSystemControl;
 	driver->MajorFunction[IRP_MJ_QUERY_VOLUME_INFORMATION] = LklQueryVolumeInformation;
 	driver->MajorFunction[IRP_MJ_DEVICE_CONTROL] = LklDeviceControl;
-	driver->MajorFunction[IRP_MJ_CREATE] = LklCreate;
-	driver->MajorFunction[IRP_MJ_CLOSE]	= LklClose;
-	driver->MajorFunction[IRP_MJ_CLEANUP] = LklCleanup;
+	driver->MajorFunction[IRP_MJ_CREATE] = LklVfsCreate;
+	driver->MajorFunction[IRP_MJ_CLOSE]	= LklVfsClose;
+	driver->MajorFunction[IRP_MJ_CLEANUP] = LklVfsCleanup;
 	driver->MajorFunction[IRP_MJ_DIRECTORY_CONTROL] =LklDummyIrp;
 	driver->MajorFunction[IRP_MJ_READ] = LklDummyIrp;
 	driver->MajorFunction[IRP_MJ_WRITE] =LklDummyIrp;

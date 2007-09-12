@@ -25,13 +25,13 @@ void LklCompleteRequest(PIRP irp, NTSTATUS status)
 	return;
 }
 
-NTSTATUS LklPostRequest(PIRP irp)
+NTSTATUS LklPostRequest(PIRPCONTEXT irp_context, PIRP irp)
 {
 	NTSTATUS status = STATUS_PENDING;
 
 	//IoMarkIrpPending(irp);
 	//TODO -- insert the irp in the queue so that it can be processed later
-
+	FreeIrpContext(irp_context);
 	LklCompleteRequest(irp, STATUS_UNSUCCESSFUL);
 	return STATUS_UNSUCCESSFUL;
 }

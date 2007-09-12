@@ -14,7 +14,6 @@
 #define SET_FLAG(flag, val)		((flag)|=(val))
 #define CLEAR_FLAG(flag, val)	((flag)&=~(val))
 #define RELEASE(res) (ExReleaseResourceForThreadLite((res), ExGetCurrentResourceThread()))
-#define	QUAD_ALIGN(val)			((((ULONG)(val))+7)&0xfffffff8)
 #define TRY_RETURN(S)			{status=S;goto try_exit;}
 
 #define VFS_UNLOAD_PENDING					0x00000001
@@ -27,7 +26,35 @@ typedef enum _IDENTIFIER_TYPE
 	VCB = ':BCV',
 	FCB = ':BCF',
 	CCB = ':BCC',
+	IRP_CONTEXT = ':PRI',
 } IDENTIFIER_TYPE;
+
+// identifier used for each defined data structure
+typedef struct lklvfs_identifier {
+	ULONG	type;
+	ULONG	size;
+} LKLVFSID;
+
+// irp context flags
+#define	VFS_IRP_CONTEXT_CAN_BLOCK			0x00000001
+#define	VFS_IRP_CONTEXT_WRITE_THROUGH		0x00000002
+#define	VFS_IRP_CONTEXT_EXCEPTION			0x00000004
+#define	VFS_IRP_CONTEXT_DEFERRED_WRITE		0x00000008
+#define	VFS_IRP_CONTEXT_ASYNC_PROCESSING	0x00000010
+#define	VFS_IRP_CONTEXT_NOT_TOP_LEVEL		0x00000020
+#define	VFS_IRP_CONTEXT_NOT_FROM_ZONE		0x80000000
+
+// irp context - used to save useful context information for later processing o irps
+typedef struct irp_context {
+	LKLVFSID				id;
+	ULONG					flags;
+	UCHAR					major_function;
+	UCHAR					minor_function;
+	PIRP					irp;
+	PDEVICE_OBJECT			target_device;
+	NTSTATUS				saved_exception_code;
+	LIST_ENTRY				thread_queue_list;
+} IRPCONTEXT, * PIRPCONTEXT;
 
 typedef struct lkl_fsd {
 	ERESOURCE				global_resource;
@@ -53,13 +80,6 @@ extern LKLFSD lklfsd;
 #define	VFS_VCB_FLAGS_SHUTDOWN			0x00000008
 #define	VFS_VCB_FLAGS_VOLUME_READ_ONLY	0x00000010
 #define	VFS_VCB_FLAGS_VCB_INITIALIZED	0x00000020
-
-// identifier used for each defined data structure
-typedef struct lklvfs_identifier {
-	ULONG	type;
-	ULONG	size;
-} LKLVFSID;
-
 
 typedef struct lkl_vcb
 {
@@ -105,6 +125,7 @@ typedef struct lkl_fcb
 	LARGE_INTEGER				lastaccess_time;
 	LARGE_INTEGER				lastwrite_time;
 	// more fields here
+	ULONG						ino;
 
 } LKLFCB, * PLKLFCB;
 
@@ -119,6 +140,7 @@ typedef struct lkl_ccb
 	UNICODE_STRING			search_pattern;	// search pattern if this file is a dir
 	ULONG					user_time;		// maintain time for user specified time
 	//more fields here
+	ULONG					fd;				//file descriptor
 
 } LKLCCB, * PLKLCCB;
 
@@ -154,19 +176,28 @@ NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp);
 void LklCreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 					  PLARGE_INTEGER alloc_size);
 void LklFreeVcb(PLKLVCB vcb);
+NTSTATUS LklCreateFcb(PLKLFCB *new_fcb, PFILE_OBJECT file_obj, PLKLVCB vcb, ULONG ino);
+void VfsFreeFcb(PLKLFCB fcb);
+NTSTATUS LklCreateNewCcb(PLKLCCB *new_ccb, PLKLFCB fcb, PFILE_OBJECT file_obj);
+void VfsCloseAndFreeCcb(PLKLCCB ccb);
+PIRPCONTEXT AllocIrpContext(PIRP irp, PDEVICE_OBJECT target_device);
+void FreeIrpContext(PIRPCONTEXT irp_context);
 
 /* cleanup.c */
-NTSTATUS LklCleanup(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS LklVfsCleanup(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp);
 
 /* close.c */
-NTSTATUS LklClose(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS LklVfsClose(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp);
 
 /* create.c */
-NTSTATUS LklCreate(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS LklVfsCreate(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp);
 
 /* misc.c */
 void LklCompleteRequest(PIRP irp, NTSTATUS status);
-NTSTATUS LklPostRequest(PIRP irp);
+NTSTATUS LklPostRequest(PIRPCONTEXT irp_context, PIRP irp);
 NTSTATUS LklDummyIrp(PDEVICE_OBJECT dev_obj, PIRP irp);
 BOOLEAN LklIsIrpTopLevel(PIRP irp);
 VOID CharToWchar(PWCHAR Destination, PCHAR Source, ULONG Length);
