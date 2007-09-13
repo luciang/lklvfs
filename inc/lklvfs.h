@@ -72,6 +72,10 @@ typedef struct lkl_fsd {
 } LKLFSD;
 
 extern LKLFSD lklfsd;
+extern PNPAGED_LOOKASIDE_LIST ccb_cachep;
+extern PNPAGED_LOOKASIDE_LIST fcb_cachep;
+extern PNPAGED_LOOKASIDE_LIST irp_context_cachep;
+extern PNPAGED_LOOKASIDE_LIST abs_path_cachep;
 
 // vcb flags
 #define VFS_VCB_FLAGS_VOLUME_MOUNTED	0x00000001

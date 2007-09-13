@@ -58,8 +58,7 @@ PLKLFCB AllocFcb()
 {
 	PLKLFCB fcb;
 
-	// LookAsideList?
-	fcb = ExAllocatePoolWithTag(NonPagedPool, sizeof(LKLFCB), 'bcF');
+	fcb = ExAllocateFromNPagedLookasideList(fcb_cachep);
 	if (!fcb)
 		return NULL;
 
@@ -76,7 +75,7 @@ void VfsFreeFcb(PLKLFCB fcb)
 
 	ExDeleteResourceLite(&fcb->fcb_resource);
 	ExDeleteResourceLite(&fcb->paging_resource);
-	ExFreePool(fcb);
+	ExFreeToNPagedLookasideList(fcb_cachep, fcb);
 }
 
 
@@ -115,7 +114,7 @@ PLKLCCB AllocCcb()
 {
 	PLKLCCB ccb = NULL;
 	// think again
-	ccb = ExAllocatePoolWithTag(NonPagedPool, sizeof(LKLCCB), 'bbC');
+	ccb = ExAllocateFromNPagedLookasideList(ccb_cachep);
 	if (!ccb)
 		return NULL;
 
@@ -131,7 +130,7 @@ void VfsCloseAndFreeCcb(PLKLCCB ccb)
 	ASSERT(ccb);
 
 //	sys_close(ccb->fd);
-	ExFreePool(ccb);
+	ExFreeToNPagedLookasideList(ccb_cachep, ccb);
 }
 
 NTSTATUS LklCreateNewCcb(PLKLCCB *new_ccb, PLKLFCB fcb, PFILE_OBJECT file_obj)
@@ -171,7 +170,7 @@ PIRPCONTEXT AllocIrpContext(PIRP irp, PDEVICE_OBJECT target_device)
 	PIRPCONTEXT irp_context = NULL;
 	PIO_STACK_LOCATION stack_location;
 
-	irp_context = ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPCONTEXT), 'tncI');
+	irp_context = ExAllocateFromNPagedLookasideList(irp_context_cachep);
 	if (!irp_context)
 		return NULL;
 
@@ -207,5 +206,5 @@ PIRPCONTEXT AllocIrpContext(PIRP irp, PDEVICE_OBJECT target_device)
 void FreeIrpContext(PIRPCONTEXT irp_context)
 {
 	ASSERT(irp_context);
-	ExFreePoolWithTag(irp_context, 'tncI');
+	ExFreeToNPagedLookasideList(irp_context_cachep, irp_context);
 }
