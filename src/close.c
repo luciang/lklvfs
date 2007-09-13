@@ -54,10 +54,6 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 	BOOLEAN						completeIrp = FALSE;
 
 	__try {
-		vcb=(PLKLVCB) irp_context->target_device->DeviceExtension;
-		ASSERT(vcb);
-		// make shure we have a vcb here
-		ASSERT(vcb->id.type == VCB && vcb->id.size == sizeof(LKLVCB));
 
 		// not fs device
 		if(irp_context->target_device == lklfsd.device) {
@@ -65,6 +61,11 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 			LklCompleteRequest(irp,STATUS_SUCCESS);
 			TRY_RETURN(STATUS_SUCCESS);
 		}
+
+		vcb=(PLKLVCB) irp_context->target_device->DeviceExtension;
+		ASSERT(vcb);
+		// make shure we have a vcb here
+		ASSERT(vcb->id.type == VCB && vcb->id.size == sizeof(LKLVCB));
 
 		// cannot block in close
 		if (!ExAcquireResourceExclusiveLite(&vcb->vcb_resource, FALSE)) {

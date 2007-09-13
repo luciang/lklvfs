@@ -28,11 +28,6 @@ NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 
 	__try {
 
-		if (device == lklfsd.device) {
-		complete_request = TRUE;
-		TRY_RETURN(STATUS_INVALID_DEVICE_REQUEST);
-		}
-
 		stack_location = IoGetCurrentIrpStackLocation(irp);
 		ASSERT(stack_location);
 

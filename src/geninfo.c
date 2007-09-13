@@ -84,7 +84,7 @@ NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 					Buffer->BytesPerSector = SECTOR_SIZE;
 					irp->IoStatus.Information = sizeof(FILE_FS_SIZE_INFORMATION);
 					status = STATUS_SUCCESS;
-					DbgPrint("VOLUME INFORMATION SIZE");
+					DbgPrint("FileFsSizeInformation");
 					__leave;
 				}
 			case FileFsDeviceInformation:
@@ -100,7 +100,7 @@ NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 					Buffer->Characteristics = vcb->target_device->Characteristics;
 					irp->IoStatus.Information = sizeof(FILE_FS_DEVICE_INFORMATION);
 					status = STATUS_SUCCESS;
-					DbgPrint("DEVICE INFORMATION");
+					DbgPrint("FileFsDeviceInformation");
 					__leave;
 				}
 			case FileFsAttributeInformation:
@@ -131,6 +131,26 @@ NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 					status = STATUS_SUCCESS;
 					__leave;
 				}
+			case FileFsFullSizeInformation:
+            {
+                PFILE_FS_FULL_SIZE_INFORMATION Buffer;
+
+                CHECK_OUT(Length < sizeof(FILE_FS_FULL_SIZE_INFORMATION),
+					STATUS_INFO_LENGTH_MISMATCH);
+
+                Buffer = (PFILE_FS_FULL_SIZE_INFORMATION) SystemBuffer;
+
+                Buffer->TotalAllocationUnits.QuadPart = 0;
+                Buffer->CallerAvailableAllocationUnits.QuadPart =
+                Buffer->ActualAvailableAllocationUnits.QuadPart = 0;
+
+                Buffer->SectorsPerAllocationUnit = 1;
+                Buffer->BytesPerSector = SECTOR_SIZE;
+                irp->IoStatus.Information = sizeof(FILE_FS_FULL_SIZE_INFORMATION);
+                status = STATUS_SUCCESS;
+				DbgPrint("FileFsFullSizeInformation");
+                __leave;
+			}
 		default:
             status = STATUS_INVALID_INFO_CLASS;
         }
@@ -153,3 +173,47 @@ NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 	return status;
 }
 
+NTSTATUS LklQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	BOOLEAN top_level;
+
+	DbgPrint(" Querry Information");
+	FsRtlEnterFileSystem();
+
+	top_level = LklIsIrpTopLevel(irp);
+
+	//TODO
+
+	LklCompleteRequest(irp, status);
+
+	if (top_level)
+		IoSetTopLevelIrp(NULL);
+
+	FsRtlExitFileSystem();
+
+	return status;
+}
+
+
+NTSTATUS LklSetInformation(PDEVICE_OBJECT device ,PIRP irp)
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	BOOLEAN top_level;
+
+	DbgPrint(" Set Information");
+	FsRtlEnterFileSystem();
+
+	top_level = LklIsIrpTopLevel(irp);
+
+	//TODO
+
+	LklCompleteRequest(irp, status);
+
+	if (top_level)
+		IoSetTopLevelIrp(NULL);
+
+	FsRtlExitFileSystem();
+
+	return status;
+}

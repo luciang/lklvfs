@@ -83,9 +83,9 @@ NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp)
 			}
 		else
 			resource_acquired = &(fcb->fcb_resource);
-			ASSERT(fcb->handle_count);
-			fcb->handle_count--;
-			vcb->open_count--;
+		ASSERT(fcb->handle_count);
+		fcb->handle_count--;
+		vcb->open_count--;
 		// TODO -- ok, it's not a vcb, so it must be a fcb
 		// and do the required cleanup for a fcb
 

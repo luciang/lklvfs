@@ -210,6 +210,7 @@ void unload_linux_kernel();
 
 /* geninfo.c */
 NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT dev_obj, PIRP irp);
-
+NTSTATUS LklQueryInformation(PDEVICE_OBJECT device ,PIRP irp);
+NTSTATUS LklSetInformation(PDEVICE_OBJECT device ,PIRP irp);
 
 #endif
