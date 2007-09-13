@@ -75,7 +75,6 @@ extern LKLFSD lklfsd;
 extern PNPAGED_LOOKASIDE_LIST ccb_cachep;
 extern PNPAGED_LOOKASIDE_LIST fcb_cachep;
 extern PNPAGED_LOOKASIDE_LIST irp_context_cachep;
-extern PNPAGED_LOOKASIDE_LIST abs_path_cachep;
 
 // vcb flags
 #define VFS_VCB_FLAGS_VOLUME_MOUNTED	0x00000001
@@ -181,9 +180,9 @@ void LklCreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb
 					  PLARGE_INTEGER alloc_size);
 void LklFreeVcb(PLKLVCB vcb);
 NTSTATUS LklCreateFcb(PLKLFCB *new_fcb, PFILE_OBJECT file_obj, PLKLVCB vcb, ULONG ino);
-void VfsFreeFcb(PLKLFCB fcb);
+void LklFreeFcb(PLKLFCB fcb);
 NTSTATUS LklCreateNewCcb(PLKLCCB *new_ccb, PLKLFCB fcb, PFILE_OBJECT file_obj);
-void VfsCloseAndFreeCcb(PLKLCCB ccb);
+void LklCloseAndFreeCcb(PLKLCCB ccb);
 PIRPCONTEXT AllocIrpContext(PIRP irp, PDEVICE_OBJECT target_device);
 void FreeIrpContext(PIRPCONTEXT irp_context);
 

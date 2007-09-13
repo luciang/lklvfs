@@ -261,7 +261,7 @@ NTSTATUS LklOpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 	__try {
 		// do we assert smth here?
 		// get info about root inode -- st_ino
-		/*
+
 		root_ino = 0; // temporary
 		fcb = LocateFcbInCore(vcb, root_ino);
 		if (!fcb) {
@@ -293,7 +293,7 @@ NTSTATUS LklOpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 
 try_exit:
 		;
-		*/
+
 	}
 	__finally {
 		;

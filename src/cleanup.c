@@ -39,6 +39,7 @@ NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp)
 	NTSTATUS status = STATUS_SUCCESS;
 	PIO_STACK_LOCATION stack_location = NULL;
 	PFILE_OBJECT file_obj = NULL;
+	PERESOURCE resource_acquired = NULL;
 	PLKLVCB	vcb = NULL;
 	PLKLFCB fcb = NULL;
 	BOOLEAN	vcb_acquired = FALSE;
@@ -75,6 +76,16 @@ NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp)
             }
             TRY_RETURN(STATUS_SUCCESS);
         }
+
+		if (!ExAcquireResourceExclusiveLite(&(fcb->fcb_resource), FALSE)) {
+				post_request = TRUE;
+				TRY_RETURN(STATUS_PENDING);
+			}
+		else
+			resource_acquired = &(fcb->fcb_resource);
+			ASSERT(fcb->handle_count);
+			fcb->handle_count--;
+			vcb->open_count--;
 		// TODO -- ok, it's not a vcb, so it must be a fcb
 		// and do the required cleanup for a fcb
 
@@ -84,6 +95,8 @@ try_exit:
 	__finally {
 		if (file_obj)
 			SET_FLAG(file_obj->Flags, FO_CLEANUP_COMPLETE);
+		if (resource_acquired)
+			RELEASE(resource_acquired);
 		if (vcb_acquired)
 			RELEASE(&vcb->vcb_resource);
 		if (post_request)

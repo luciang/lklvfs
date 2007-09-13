@@ -69,7 +69,7 @@ PLKLFCB AllocFcb()
 	return fcb;
 }
 
-void VfsFreeFcb(PLKLFCB fcb)
+void LklFreeFcb(PLKLFCB fcb)
 {
 	ASSERT(fcb);
 
@@ -125,7 +125,7 @@ PLKLCCB AllocCcb()
 	return ccb;
 }
 
-void VfsCloseAndFreeCcb(PLKLCCB ccb)
+void LklCloseAndFreeCcb(PLKLCCB ccb)
 {
 	ASSERT(ccb);
 
