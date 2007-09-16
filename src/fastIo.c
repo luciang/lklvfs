@@ -4,7 +4,7 @@
 
 #include <fastio.h>
 
-BOOLEAN LklFastIoCheckIfPossible (
+BOOLEAN DDKAPI VfsFastIoCheckIfPossible (
               IN PFILE_OBJECT         FileObject,
               IN PLARGE_INTEGER       FileOffset,
               IN ULONG                Length,
@@ -18,7 +18,7 @@ BOOLEAN LklFastIoCheckIfPossible (
 	return TRUE;
 }
 
-BOOLEAN LklFastIoQueryBasicInfo (
+BOOLEAN DDKAPI VfsFastIoQueryBasicInfo (
 	      IN PFILE_OBJECT             FileObject,
               IN BOOLEAN                  Wait,
               OUT PFILE_BASIC_INFORMATION Buffer,
@@ -29,7 +29,7 @@ BOOLEAN LklFastIoQueryBasicInfo (
 	return FALSE;
 }
 
-BOOLEAN LklFastIoQueryStandardInfo (
+BOOLEAN DDKAPI VfsFastIoQueryStandardInfo (
                 IN PFILE_OBJECT                 FileObject,
                 IN BOOLEAN                      Wait,
                 OUT PFILE_STANDARD_INFORMATION  Buffer,
@@ -40,7 +40,7 @@ BOOLEAN LklFastIoQueryStandardInfo (
 	return FALSE;
 }
 
-BOOLEAN LklFastIoQueryNetworkOpenInfo (
+BOOLEAN DDKAPI VfsFastIoQueryNetworkOpenInfo (
      IN PFILE_OBJECT                     FileObject,
      IN BOOLEAN                          Wait,
      OUT PFILE_NETWORK_OPEN_INFORMATION  Buffer,
@@ -51,8 +51,7 @@ BOOLEAN LklFastIoQueryNetworkOpenInfo (
 	return FALSE;
 }
 
-BOOLEAN
-LklFastIoLock (
+BOOLEAN DDKAPI VfsFastIoLock (
            IN PFILE_OBJECT         FileObject,
            IN PLARGE_INTEGER       FileOffset,
            IN PLARGE_INTEGER       Length,
@@ -70,8 +69,7 @@ LklFastIoLock (
 
 
 
-BOOLEAN
-LklFastIoUnlockSingle (
+BOOLEAN DDKAPI VfsFastIoUnlockSingle (
                IN PFILE_OBJECT         FileObject,
                IN PLARGE_INTEGER       FileOffset,
                IN PLARGE_INTEGER       Length,
@@ -85,8 +83,7 @@ LklFastIoUnlockSingle (
 }
 
 
-BOOLEAN
-LklFastIoUnlockAll (
+BOOLEAN DDKAPI VfsFastIoUnlockAll (
             IN PFILE_OBJECT         FileObject,
             IN PEPROCESS            Process,
             OUT PIO_STATUS_BLOCK    IoStatus,
@@ -97,11 +94,10 @@ LklFastIoUnlockAll (
 }
 
 
-BOOLEAN
-LklFastIoUnlockAllByKey (
+BOOLEAN DDKAPI VfsFastIoUnlockAllByKey (
              IN PFILE_OBJECT         FileObject,
-             IN PEPROCESS            Process,
-             IN ULONG                Key,
+             PVOID                   Process,
+             ULONG                   Key,
              OUT PIO_STATUS_BLOCK    IoStatus,
              IN PDEVICE_OBJECT       DeviceObject)
 {

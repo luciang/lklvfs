@@ -1,13 +1,12 @@
 /*
 * close & it's friends
+* TODOs: -
 */
 #include <lklvfs.h>
 
-NTSTATUS LklVfsClose(PDEVICE_OBJECT device, PIRP irp)
+NTSTATUS DDKAPI VfsClose(PDEVICE_OBJECT device, PIRP irp)
 {
 	NTSTATUS status = STATUS_SUCCESS;
-	NTSTATUS exception;
-	PIO_STACK_LOCATION stack_location = NULL;
 	PIRPCONTEXT irp_context;
 	BOOLEAN top_level;
 
@@ -17,19 +16,19 @@ NTSTATUS LklVfsClose(PDEVICE_OBJECT device, PIRP irp)
 	ASSERT(irp);
 
 	FsRtlEnterFileSystem();
+
+	if (device == lklfsd.device) {
+		LklCompleteRequest(irp, STATUS_SUCCESS);
+		FsRtlExitFileSystem();
+		return STATUS_SUCCESS;
+	}
+
 	top_level = LklIsIrpTopLevel(irp);
 
-	__try {
 		irp_context = AllocIrpContext(irp, device);
 		ASSERT(irp_context);
 
 		status = CommonClose(irp_context, irp);
-	}
-	__except(EXCEPTION_EXECUTE_HANDLER) {
-		exception = GetExceptionCode();
-			if(!NT_SUCCESS(exception))
-				DbgPrint("close: Exception %x ", exception);
-	}
 
 	if (top_level)
 		IoSetTopLevelIrp(NULL);
@@ -53,99 +52,90 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 	BOOLEAN						postRequest = FALSE;
 	BOOLEAN						completeIrp = FALSE;
 
-	__try {
+	vcb=(PLKLVCB) irp_context->target_device->DeviceExtension;
+	ASSERT(vcb);
+	// make shure we have a vcb here
+	ASSERT(vcb->id.type == VCB && vcb->id.size == sizeof(LKLVCB));
 
-		// not fs device
-		if(irp_context->target_device == lklfsd.device) {
-			// never fail for fs device
-			LklCompleteRequest(irp,STATUS_SUCCESS);
-			TRY_RETURN(STATUS_SUCCESS);
+	// never make a close request block
+	if (!ExAcquireResourceExclusiveLite(&vcb->vcb_resource, FALSE)) {
+			postRequest = TRUE;
+			TRY_RETURN(STATUS_PENDING);
+		}
+	else {
+			completeIrp = TRUE;
+			vcbResourceAquired = TRUE;
 		}
 
-		vcb=(PLKLVCB) irp_context->target_device->DeviceExtension;
-		ASSERT(vcb);
-		// make shure we have a vcb here
-		ASSERT(vcb->id.type == VCB && vcb->id.size == sizeof(LKLVCB));
+	stack_location = IoGetCurrentIrpStackLocation(irp);
+	ASSERT(stack_location);
 
-		// cannot block in close
-		if (!ExAcquireResourceExclusiveLite(&vcb->vcb_resource, FALSE)) {
-				postRequest = TRUE;
-				TRY_RETURN(STATUS_PENDING);
-			}
-		else {
-				completeIrp = TRUE;
-				vcbResourceAquired = TRUE;
-			}
-
-		stack_location = IoGetCurrentIrpStackLocation(irp);
-		ASSERT(stack_location);
-
-		// file object
-		file = stack_location->FileObject;
-		ASSERT(file);
-		fcb = (PLKLFCB) file->FsContext;
-		ASSERT(fcb);
-		ccb = (PLKLCCB) file->FsContext2;
-		if (fcb->id.type == VCB)
-		{
-			DbgPrint("VOLUME CLOSE");
-			InterlockedDecrement(&vcb->reference_count);
-			if (!vcb->reference_count && FLAG_ON(vcb->flags, VFS_VCB_FLAGS_BEING_DISMOUNTED)) {
-				freeVcb = TRUE;
-			}
-			TRY_RETURN(STATUS_SUCCESS);
-		}
-
-		 ASSERT((fcb->id.type == FCB) && (fcb->id.size == sizeof(LKLFCB)));
-
-		// acquire fcb resource
-		 if (!ExAcquireResourceExclusiveLite(&(fcb->fcb_resource), FALSE)) {
-				postRequest = TRUE;
-				TRY_RETURN(STATUS_PENDING);
-			} else
-				resource_acquired = &(fcb->fcb_resource);
-
-		// free ccb
-		ASSERT(ccb);
-		RemoveEntryList(&ccb->next);
-
-		LklCloseAndFreeCcb(ccb);
-
-		file->FsContext2 = NULL;
-
-		// decrement reference count
-		ASSERT(fcb->reference_count);
-		ASSERT(vcb->reference_count);
-		InterlockedDecrement(&fcb->reference_count);
+	// file object
+	file = stack_location->FileObject;
+	ASSERT(file);
+	fcb = (PLKLFCB) file->FsContext;
+	ASSERT(fcb);
+	ccb = (PLKLCCB) file->FsContext2;
+	if (fcb->id.type == VCB)
+	{
+		DbgPrint("VOLUME CLOSE");
 		InterlockedDecrement(&vcb->reference_count);
-
-		// if fcb reference count == 0 release resource and free fcb; return success
-		if (fcb->reference_count == 0) {
-			RemoveEntryList(&fcb->next);
-			RELEASE(resource_acquired);
-			resource_acquired = NULL;
-			LklFreeFcb(fcb);
+		if (!vcb->reference_count && FLAG_ON(vcb->flags, VFS_VCB_FLAGS_BEING_DISMOUNTED)) {
+			freeVcb = TRUE;
 		}
 		completeIrp = TRUE;
+		TRY_RETURN(STATUS_SUCCESS);
+	}
+
+	 ASSERT((fcb->id.type == FCB) && (fcb->id.size == sizeof(LKLFCB)));
+
+	// acquire fcb resource
+	 if (!ExAcquireResourceExclusiveLite(&(fcb->fcb_resource), FALSE)) {
+			postRequest = TRUE;
+			TRY_RETURN(STATUS_PENDING);
+		} else
+			resource_acquired = &(fcb->fcb_resource);
+
+	// free ccb
+	ASSERT(ccb);
+	RemoveEntryList(&ccb->next);
+
+	CloseAndFreeCcb(ccb);
+
+	file->FsContext2 = NULL;
+
+	// decrement reference count
+	ASSERT(fcb->reference_count);
+	ASSERT(vcb->reference_count);
+	InterlockedDecrement(&fcb->reference_count);
+	InterlockedDecrement(&vcb->reference_count);
+
+	// if fcb reference count == 0 release resource and free fcb; return success
+	if (fcb->reference_count == 0) {
+		RemoveEntryList(&fcb->next);
+		RELEASE(resource_acquired);
+		resource_acquired = NULL;
+		FreeFcb(fcb);
+	}
+
+	completeIrp = TRUE;
 
 try_exit:
-		;
+     
+	if (resource_acquired)
+		RELEASE(resource_acquired);
+	if (vcbResourceAquired)
+		RELEASE(&vcb->vcb_resource);
+	if (postRequest) {
+		DbgPrint("post request");
+		status = LklPostRequest(irp_context, irp);
 	}
-	__finally {
-		if (resource_acquired)
-			RELEASE(resource_acquired);
-		if (vcbResourceAquired)
-			RELEASE(&vcb->vcb_resource);
-		if (postRequest) {
-			status = LklPostRequest(irp_context, irp);
-		}
-		else if (completeIrp && status != STATUS_PENDING) {
-			LklCompleteRequest(irp, status);
-			FreeIrpContext(irp_context);
-		}
-		if (freeVcb)
-			LklFreeVcb(vcb);
+	else if (completeIrp && status != STATUS_PENDING) {
+		LklCompleteRequest(irp, status);
+		FreeIrpContext(irp_context);
 	}
+	if (freeVcb)
+		FreeVcb(vcb);
 
 	return status;
 }

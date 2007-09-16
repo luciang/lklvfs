@@ -1,5 +1,7 @@
 /**
 * all device control operations should be here
+* Put all TODOs here: none
+*
 **/
 
 #include <lklvfs.h>
@@ -7,13 +9,13 @@
 NTSTATUS LklIoctlCompletion(PDEVICE_OBJECT device, PIRP irp, PVOID context);
 NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp);
 
-NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp)
+NTSTATUS DDKAPI VfsDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 {
 	NTSTATUS status=STATUS_SUCCESS;
 	BOOLEAN top_level;
 	ULONG ioctl = 0;
 	PIO_STACK_LOCATION stack_location = NULL;
-	PIO_STACK_LOCATION next_stack_location = NULL;
+//	PIO_STACK_LOCATION next_stack_location = NULL;
 	BOOLEAN complete_request = FALSE;
 	PLKLVCB vcb = NULL;
 	PLKLFCB fcb = NULL;
@@ -22,53 +24,45 @@ NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 
 	ASSERT(device);
 	ASSERT(irp);
-	DbgPrint("Device Control");
 	top_level = LklIsIrpTopLevel(irp);
 	FsRtlEnterFileSystem();
 
-	__try {
+	stack_location = IoGetCurrentIrpStackLocation(irp);
+	ASSERT(stack_location);
 
-		stack_location = IoGetCurrentIrpStackLocation(irp);
-		ASSERT(stack_location);
+	ioctl = stack_location->Parameters.DeviceIoControl.IoControlCode;
 
-		ioctl = stack_location->Parameters.DeviceIoControl.IoControlCode;
+	if (ioctl == IOCTL_PREPARE_TO_UNLOAD) {
+		complete_request = TRUE;
+		DbgPrint("Prepare to unload");
+		status = LklPrepareToUnload(device,irp);
+		TRY_RETURN(status);
+	}
 
-		if (ioctl == IOCTL_PREPARE_TO_UNLOAD) {
-			complete_request = TRUE;
-			DbgPrint("Prepare to unload");
-			status = LklPrepareToUnload(device,irp);
-			TRY_RETURN(status);
-		}
+	file = stack_location->FileObject;
+	ASSERT(file);
+	fcb = (PLKLFCB) file->FsContext;
+	ASSERT(fcb);
 
-		file = stack_location->FileObject;
-		ASSERT(file);
-		fcb = (PLKLFCB) file->FsContext;
-		ASSERT(fcb);
+	if (fcb->id.type == VCB) {
+		DbgPrint("Device Control");
+		vcb = (PLKLVCB) fcb;
+	} else {
+		vcb = fcb->vcb;
+	}
+	ASSERT(vcb);
 
-		if (fcb->id.type == VCB) {
-			DbgPrint("Device Control");
-			vcb = (PLKLVCB) fcb;
-		} else {
-			vcb = fcb->vcb;
-		}
-		ASSERT(vcb);
+	targetDevice = vcb->target_device;
 
-		targetDevice = vcb->target_device;
-
-		// Pass on the IOCTL to the driver below
-		complete_request = FALSE;
-		IoSetCompletionRoutine(irp, LklIoctlCompletion, NULL, TRUE, TRUE, TRUE);
-		status = IoCallDriver(targetDevice, irp);
+	// Pass on the IOCTL to the driver below
+	complete_request = FALSE;
+	//next_stack_location = IoGetNextIrpStackLocation(irp);
+	//*next_stack_location = *stack_location;
+	IoSetCompletionRoutine(irp, LklIoctlCompletion, NULL, TRUE, TRUE, TRUE);
+	status = IoCallDriver(targetDevice, irp);
 
 try_exit:
-		;
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-	{
-		status = GetExceptionCode();
-		if(!NT_SUCCESS(status))
-			DbgPrint("device control: Exception %x ", status);
-	}
+	
 	if(complete_request)
 		LklCompleteRequest(irp, status);
 	if (top_level)
@@ -88,29 +82,23 @@ NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp)
 
 	DbgPrint("PREPARE TO UNLOAD CALLED");
 
-	__try
-	{
+	CHECK_OUT(device != lklfsd.device, STATUS_INVALID_DEVICE_REQUEST);
 
-		CHECK_OUT(device != lklfsd.device, STATUS_INVALID_DEVICE_REQUEST);
+	ExAcquireResourceExclusiveLite(&lklfsd.global_resource, TRUE);
+	acq_resource = TRUE;
 
-		ExAcquireResourceExclusiveLite(&lklfsd.global_resource, TRUE);
-		acq_resource = TRUE;
+	CHECK_OUT(FLAG_ON(lklfsd.flags, VFS_UNLOAD_PENDING), STATUS_ACCESS_DENIED);
+	CHECK_OUT(!IsListEmpty(&lklfsd.vcb_list), STATUS_ACCESS_DENIED);
 
-		CHECK_OUT(FLAG_ON(lklfsd.flags, VFS_UNLOAD_PENDING), STATUS_ACCESS_DENIED);
-		CHECK_OUT(!IsListEmpty(&lklfsd.vcb_list), STATUS_ACCESS_DENIED);
+	IoUnregisterFileSystem(lklfsd.device);
+	IoDeleteDevice(lklfsd.device);
 
-		IoUnregisterFileSystem(lklfsd.device);
-		IoDeleteDevice(lklfsd.device);
-
-		SET_FLAG(lklfsd.flags, VFS_UNLOAD_PENDING);
+	SET_FLAG(lklfsd.flags, VFS_UNLOAD_PENDING);
 try_exit:
-		;
-	}
-	__finally
-	{
-		if (acq_resource)
+
+	if (acq_resource)
 			RELEASE(&lklfsd.global_resource);
-	}
+
 	return status;
 }
 

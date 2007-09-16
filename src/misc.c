@@ -1,5 +1,6 @@
 /**
 * useful functions
+* TODOs: uncomment lines!
 **/
 
 #include<lklvfs.h>
@@ -16,7 +17,7 @@ BOOLEAN LklIsIrpTopLevel(PIRP irp)
 void LklCompleteRequest(PIRP irp, NTSTATUS status)
 {
 	if (irp != NULL) {
-		if (NT_ERROR(status) && FLAG_ON(irp->Flags, IRP_INPUT_OPERATION))
+		if (!NT_SUCCESS(status) && FLAG_ON(irp->Flags, IRP_INPUT_OPERATION))
 			irp->IoStatus.Information = 0;
 		irp->IoStatus.Status = status;
 
@@ -25,18 +26,8 @@ void LklCompleteRequest(PIRP irp, NTSTATUS status)
 	return;
 }
 
-NTSTATUS LklPostRequest(PIRPCONTEXT irp_context, PIRP irp)
-{
-	NTSTATUS status = STATUS_PENDING;
 
-	//IoMarkIrpPending(irp);
-	//TODO -- insert the irp in the queue so that it can be processed later
-	FreeIrpContext(irp_context);
-	LklCompleteRequest(irp, STATUS_UNSUCCESSFUL);
-	return STATUS_UNSUCCESSFUL;
-}
-
-NTSTATUS LklDummyIrp(PDEVICE_OBJECT dev_obj, PIRP irp)
+NTSTATUS DDKAPI VfsDummyIrp(PDEVICE_OBJECT dev_obj, PIRP irp)
 {
 	BOOLEAN top_level = FALSE;
 	NTSTATUS status = STATUS_NOT_IMPLEMENTED;
@@ -71,7 +62,7 @@ VOID CharToWchar(PWCHAR Destination, PCHAR Source, ULONG Length)
 	}
 }
 
-void LklVfsReportError(const char * string)
+void VfsReportError(const char * string)
 {
 	//todo - make a nice log entry (but for now we stick with DbgPrint)
 

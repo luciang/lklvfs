@@ -1,9 +1,10 @@
 #ifndef _LKL_VFS_H
 #define _LKL_VFS_H
 
-#include <ntifs.h>
+#include <ddk/ntifs.h>
 
-#define LKL_DECLARE_NONSTD(type)     type __cdecl
+#undef FASTCALL
+
 
 #define LKL_DEVICE		L"\\DosDevices\\F:"
 #define LKL_FS_NAME		L"\\lkl"
@@ -21,13 +22,10 @@
 		CTL_CODE(FILE_DEVICE_UNKNOWN, 2048, METHOD_NEITHER, FILE_WRITE_ACCESS)
 
 // used for identifier
-typedef enum _IDENTIFIER_TYPE
-{
-	VCB = ':BCV',
-	FCB = ':BCF',
-	CCB = ':BCC',
-	IRP_CONTEXT = ':PRI',
-} IDENTIFIER_TYPE;
+#define	CCB					(0xfdecba02)
+#define	FCB					(0xfdecba03)
+#define	VCB					(0xfdecba04)
+#define	IRP_CONTEXT			(0xfdecba05)
 
 // identifier used for each defined data structure
 typedef struct lklvfs_identifier {
@@ -44,7 +42,7 @@ typedef struct lklvfs_identifier {
 #define	VFS_IRP_CONTEXT_NOT_TOP_LEVEL		0x00000020
 #define	VFS_IRP_CONTEXT_NOT_FROM_ZONE		0x80000000
 
-// irp context - used to save useful context information for later processing o irps
+// irp context - used to save useful context information for later processing of irps
 typedef struct irp_context {
 	LKLVFSID				id;
 	ULONG					flags;
@@ -53,25 +51,28 @@ typedef struct irp_context {
 	PIRP					irp;
 	PDEVICE_OBJECT			target_device;
 	NTSTATUS				saved_exception_code;
-	LIST_ENTRY				thread_queue_list;
+	PIO_WORKITEM			work_item;
+
 } IRPCONTEXT, * PIRPCONTEXT;
 
 typedef struct lkl_fsd {
 	ERESOURCE				global_resource;
 	PDRIVER_OBJECT			driver;
 	PDEVICE_OBJECT			device;		// fs device
-	ULONG					flags;
+	ULONG					flags;		// flags- one is used for unload
 	LIST_ENTRY				vcb_list;	// head of mounted volume list
 
 	FAST_IO_DISPATCH		fast_io_dispatch;
-	CACHE_MANAGER_CALLBACKS	cache_mgr_callbacks;
+	CACHE_MANAGER_CALLBACKS	cache_mgr_callbacks; // cache manager callbacks
 // temporary use:
 	PDEVICE_OBJECT			physical_device; // current mounted device
 	HANDLE					linux_thread;
-	PVOID					mem_zone;
+
 } LKLFSD;
 
+// global data used by our driver
 extern LKLFSD lklfsd;
+// lookaside lists for fcb, ccb and irp_context structures
 extern PNPAGED_LOOKASIDE_LIST ccb_cachep;
 extern PNPAGED_LOOKASIDE_LIST fcb_cachep;
 extern PNPAGED_LOOKASIDE_LIST irp_context_cachep;
@@ -108,6 +109,24 @@ typedef struct lkl_vcb
 
 } LKLVCB, * PLKLVCB;
 
+// fcb flags
+#define	VFS_FCB_IN_INIT						0x00000001
+#define	VFS_FCB_IN_TEARDOWN					0x00000002
+#define	VFS_FCB_PAGE_FILE					0x00000004
+#define	VFS_FCB_DIRECTORY					0x00000008
+#define	VFS_FCB_WRITE_THROUGH				0x00000020
+#define	VFS_FCB_MAPPED						0x00000040
+#define	VFS_FCB_FAST_IO_READ_IN_PROGESS		0x00000080
+#define	VFS_FCB_FAST_IO_WRITE_IN_PROGESS	0x00000100
+#define	VFS_FCB_DELETE_ON_CLOSE				0x00000200
+#define	VFS_FCB_MODIFIED					0x00000400
+#define	VFS_FCB_ACCESSED					0x00000800
+#define	VFS_FCB_READ_ONLY					0x00001000
+#define	VFS_FCB_BLOCKS_INITIALIZED			0x00008000
+#define	VFS_FCB_SPECIAL_FILE				0x00010000
+#define	VFS_FCB_HIDDEN_FILE					0x00020000
+#define	VFS_FCB_NOT_FROM_ZONE				0x80000000
+
 typedef struct lkl_fcb
 {
 	// required header
@@ -128,6 +147,7 @@ typedef struct lkl_fcb
 	LARGE_INTEGER				lastaccess_time;
 	LARGE_INTEGER				lastwrite_time;
 	// more fields here
+	UNICODE_STRING				name;
 	ULONG						ino;
 
 } LKLFCB, * PLKLFCB;
@@ -150,67 +170,79 @@ typedef struct lkl_ccb
 
 /* init.c */
 
-NTSTATUS DriverEntry(PDRIVER_OBJECT driver, PUNICODE_STRING reg_path);
 void InitializeFunctionPointers(PDRIVER_OBJECT driver);
 void InitializeFastIO(PDRIVER_OBJECT driver);
-VOID LklDriverUnload(PDRIVER_OBJECT driver);
+VOID DDKAPI DriverUnload(PDRIVER_OBJECT driver);
 
 /* fscontrol.c */
-NTSTATUS LklFileSystemControl(PDEVICE_OBJECT device, PIRP irp);
-NTSTATUS LklMountVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
-NTSTATUS LklUserFileSystemRequest(PIRP irp, PIO_STACK_LOCATION stack_location);
-NTSTATUS LklLockVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
-void LklPurgeFile(PLKLFCB fcb, BOOLEAN flush_before_purge);
-void LklPurgeVolume(PLKLVCB vcb, BOOLEAN flush_before_purge);
-void LklSetVpbFlag(PVPB vpb, USHORT flag);
-void LklClearVpbFlag(PVPB vpb, USHORT flag);
-NTSTATUS LklUnlockVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
-NTSTATUS LklDismountVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
-NTSTATUS LklIsVolumeMounted(PIRP irp, PIO_STACK_LOCATION stack_location);
-NTSTATUS LklVerifyVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
+NTSTATUS DDKAPI VfsFileSystemControl(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS DDKAPI VfsMountVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
+NTSTATUS DDKAPI VfsUserFileSystemRequest(PIRP irp, PIO_STACK_LOCATION stack_location);
+NTSTATUS DDKAPI VfsLockVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
+void     DDKAPI VfsPurgeVolume(PLKLVCB vcb, BOOLEAN flush_before_purge);
+NTSTATUS DDKAPI VfsUnLockVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
+NTSTATUS DDKAPI VfsUnmountVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
+NTSTATUS DDKAPI VfsIsVolumeMounted(PIRP irp, PIO_STACK_LOCATION stack_location);
+NTSTATUS DDKAPI VfsVerifyVolume(PIRP irp, PIO_STACK_LOCATION stack_location);
 
-NTSTATUS LklUmount(PDEVICE_OBJECT dev, PFILE_OBJECT file);
-NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb);
+void SetVpbFlag(PVPB vpb, USHORT flag);
+void ClearVpbFlag(PVPB vpb, USHORT flag);
+NTSTATUS VfsUmount(PDEVICE_OBJECT dev, PFILE_OBJECT file);
+NTSTATUS VfsMount(IN PDEVICE_OBJECT dev,IN PVPB vpb);
 
 /* devcontrol.c */
-NTSTATUS LklDeviceControl(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS DDKAPI VfsDeviceControl(PDEVICE_OBJECT device, PIRP irp);
 
 /* alloc.c */
-void LklCreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
+void       CreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 					  PLARGE_INTEGER alloc_size);
-void LklFreeVcb(PLKLVCB vcb);
-NTSTATUS LklCreateFcb(PLKLFCB *new_fcb, PFILE_OBJECT file_obj, PLKLVCB vcb, ULONG ino);
-void LklFreeFcb(PLKLFCB fcb);
-NTSTATUS LklCreateNewCcb(PLKLCCB *new_ccb, PLKLFCB fcb, PFILE_OBJECT file_obj);
-void LklCloseAndFreeCcb(PLKLCCB ccb);
+void       FreeVcb(PLKLVCB vcb);
+NTSTATUS   CreateFcb(PLKLFCB *new_fcb, PFILE_OBJECT file_obj, PLKLVCB vcb, ULONG ino);
+void       FreeFcb(PLKLFCB fcb);
+NTSTATUS   CreateNewCcb(PLKLCCB *new_ccb, PLKLFCB fcb, PFILE_OBJECT file_obj);
+void       CloseAndFreeCcb(PLKLCCB ccb);
 PIRPCONTEXT AllocIrpContext(PIRP irp, PDEVICE_OBJECT target_device);
-void FreeIrpContext(PIRPCONTEXT irp_context);
+void        FreeIrpContext(PIRPCONTEXT irp_context);
 
 /* cleanup.c */
-NTSTATUS LklVfsCleanup(PDEVICE_OBJECT device, PIRP irp);
-NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp);
+NTSTATUS DDKAPI VfsCleanup(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS        CommonCleanup(PIRPCONTEXT irp_context, PIRP irp);
 
 /* close.c */
-NTSTATUS LklVfsClose(PDEVICE_OBJECT device, PIRP irp);
-NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp);
+NTSTATUS DDKAPI VfsClose(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS        CommonClose(PIRPCONTEXT irp_context, PIRP irp);
 
 /* create.c */
-NTSTATUS LklVfsCreate(PDEVICE_OBJECT device, PIRP irp);
-NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp);
+NTSTATUS DDKAPI VfsCreate(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS        CommonCreate(PIRPCONTEXT irp_context, PIRP irp);
+
+/* dircontrol.c */
+NTSTATUS DDKAPI VfsDirectoryControl(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS        CommonDirectoryControl(PIRPCONTEXT irp_context, PIRP irp);
 
 /* misc.c */
+NTSTATUS DDKAPI VfsDummyIrp(PDEVICE_OBJECT dev_obj, PIRP irp);
 void LklCompleteRequest(PIRP irp, NTSTATUS status);
-NTSTATUS LklPostRequest(PIRPCONTEXT irp_context, PIRP irp);
-NTSTATUS LklDummyIrp(PDEVICE_OBJECT dev_obj, PIRP irp);
 BOOLEAN LklIsIrpTopLevel(PIRP irp);
 VOID CharToWchar(PWCHAR Destination, PCHAR Source, ULONG Length);
-void LklVfsReportError(const char * string);
+void VfsReportError(const char * string);
+
 NTSTATUS run_linux_kernel();
 void unload_linux_kernel();
 
+/* workqueue.c */
+NTSTATUS LklPostRequest(PIRPCONTEXT irp_context, PIRP irp);
 /* geninfo.c */
-NTSTATUS LklQueryVolumeInformation(PDEVICE_OBJECT dev_obj, PIRP irp);
-NTSTATUS LklQueryInformation(PDEVICE_OBJECT device ,PIRP irp);
-NTSTATUS LklSetInformation(PDEVICE_OBJECT device ,PIRP irp);
+NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT dev_obj, PIRP irp);
+NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp);
+NTSTATUS DDKAPI VfsSetInformation(PDEVICE_OBJECT device ,PIRP irp);
+
+/* cmcallbacks.c */
+
+void    DDKAPI   VfsRelLazyWrite(PVOID context);
+BOOLEAN DDKAPI   VfsAcqLazyWrite(PVOID context, BOOLEAN wait);
+void    DDKAPI   VfsRelLazyWrite(PVOID context);
+BOOLEAN DDKAPI   VfsAcqReadAhead(PVOID context, BOOLEAN wait);
+void    DDKAPI   VfsRelReadAhead(PVOID context);
 
 #endif

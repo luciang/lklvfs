@@ -1,10 +1,12 @@
 /**
 * allocation related stuff
+* put all TODOs here:
+* - uncomment the sys_close line from CloseAndFreeCcb
 **/
 
 #include<lklvfs.h>
 
-void LklCreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
+void CreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 					  PLARGE_INTEGER alloc_size)
 {
 	NTSTATUS status = STATUS_SUCCESS;
@@ -41,9 +43,9 @@ void LklCreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb
 	SET_FLAG(vcb->flags, VFS_VCB_FLAGS_VCB_INITIALIZED);
 }
 
-void LklFreeVcb(PLKLVCB vcb)
+void FreeVcb(PLKLVCB vcb)
 {
-	LklClearVpbFlag(vcb->vpb, VPB_MOUNTED);
+	ClearVpbFlag(vcb->vpb, VPB_MOUNTED);
 
 	ExAcquireResourceExclusiveLite(&lklfsd.global_resource, TRUE);
 	RemoveEntryList(&vcb->next);
@@ -69,17 +71,18 @@ PLKLFCB AllocFcb()
 	return fcb;
 }
 
-void LklFreeFcb(PLKLFCB fcb)
+void FreeFcb(PLKLFCB fcb)
 {
 	ASSERT(fcb);
-
+	if(fcb->name.Buffer)
+		ExFreePool(fcb->name.Buffer);
 	ExDeleteResourceLite(&fcb->fcb_resource);
 	ExDeleteResourceLite(&fcb->paging_resource);
 	ExFreeToNPagedLookasideList(fcb_cachep, fcb);
 }
 
 
-NTSTATUS LklCreateFcb(PLKLFCB *new_fcb, PFILE_OBJECT file_obj, PLKLVCB vcb, ULONG ino)
+NTSTATUS CreateFcb(PLKLFCB *new_fcb, PFILE_OBJECT file_obj, PLKLVCB vcb, ULONG ino)
 {
 	NTSTATUS status = STATUS_SUCCESS;
 	PLKLFCB fcb = NULL;
@@ -87,33 +90,34 @@ NTSTATUS LklCreateFcb(PLKLFCB *new_fcb, PFILE_OBJECT file_obj, PLKLVCB vcb, ULON
 	ASSERT(vcb);
 	ASSERT(file_obj);
 
-	__try
-	{
-		fcb = AllocFcb();
-		CHECK_OUT(!fcb, STATUS_INSUFFICIENT_RESOURCES);
+	fcb = AllocFcb();
+	CHECK_OUT(!fcb, STATUS_INSUFFICIENT_RESOURCES);
 
-		ExInitializeResourceLite(&(fcb->fcb_resource));
-		ExInitializeResourceLite(&(fcb->paging_resource));
+	ExInitializeResourceLite(&(fcb->fcb_resource));
+	ExInitializeResourceLite(&(fcb->paging_resource));
 
-		fcb->vcb = vcb;
-		InsertTailList(&(vcb->fcb_list), &(fcb->next));
+	fcb->flags = 0;
+	fcb->vcb = vcb;
+	fcb->common_header.NodeTypeCode = (USHORT)FCB;
+	fcb->common_header.NodeByteSize = sizeof(PLKLFCB);
+	fcb->common_header.IsFastIoPossible = FastIoIsNotPossible;
+	fcb->common_header.Resource = &(fcb->fcb_resource);
+	fcb->common_header.PagingIoResource = &(fcb->paging_resource);
 
-		InitializeListHead(&(fcb->ccb_list));
+	InsertTailList(&(vcb->fcb_list), &(fcb->next));
 
-		*new_fcb = fcb;
+	InitializeListHead(&(fcb->ccb_list));
+
+	*new_fcb = fcb;
 try_exit:
-		;
-	}
-	__finally
-	{
-	}
+
 	return status;
 }
 
 PLKLCCB AllocCcb()
 {
 	PLKLCCB ccb = NULL;
-	// think again
+
 	ccb = ExAllocateFromNPagedLookasideList(ccb_cachep);
 	if (!ccb)
 		return NULL;
@@ -125,7 +129,7 @@ PLKLCCB AllocCcb()
 	return ccb;
 }
 
-void LklCloseAndFreeCcb(PLKLCCB ccb)
+void CloseAndFreeCcb(PLKLCCB ccb)
 {
 	ASSERT(ccb);
 
@@ -133,35 +137,28 @@ void LklCloseAndFreeCcb(PLKLCCB ccb)
 	ExFreeToNPagedLookasideList(ccb_cachep, ccb);
 }
 
-NTSTATUS LklCreateNewCcb(PLKLCCB *new_ccb, PLKLFCB fcb, PFILE_OBJECT file_obj)
+NTSTATUS CreateNewCcb(PLKLCCB *new_ccb, PLKLFCB fcb, PFILE_OBJECT file_obj)
 {
 	PLKLCCB ccb = NULL;
 	NTSTATUS status = STATUS_SUCCESS;
 
-	__try
-	{
-		ccb = AllocCcb();
-		CHECK_OUT(!ccb, STATUS_INSUFFICIENT_RESOURCES);
-		ccb->fcb = fcb;
-		ccb->file_obj = file_obj;
-		ccb->offset.QuadPart = 0;
+	ccb = AllocCcb();
+	CHECK_OUT(!ccb, STATUS_INSUFFICIENT_RESOURCES);
+	ccb->fcb = fcb;
+	ccb->file_obj = file_obj;
+	ccb->offset.QuadPart = 0;
 
-		// ccb->fd = sys_open ( ... ) - path must be changed
-		InterlockedIncrement(&fcb->reference_count);
-		InterlockedIncrement(&fcb->handle_count);
-		InterlockedIncrement(&fcb->vcb->reference_count);
+	InterlockedIncrement(&fcb->reference_count);
+	InterlockedIncrement(&fcb->handle_count);
+	InterlockedIncrement(&fcb->vcb->reference_count);
 
-		fcb->vcb->open_count++;
+	fcb->vcb->open_count++;
 
-		InsertTailList(&(fcb->ccb_list), &(ccb->next));
+	InsertTailList(&(fcb->ccb_list), &(ccb->next));
 
-		*new_ccb = ccb;
+	*new_ccb = ccb;
 try_exit:
-		;
-	}
-	__finally
-	{
-	}
+
 	return status;
 }
 
