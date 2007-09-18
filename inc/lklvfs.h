@@ -8,8 +8,8 @@
 
 
 #define LKL_DEVICE		L"\\DosDevices\\F:"
-#define LKL_FS_NAME		L"\\lkl"
-#define LKL_DOS_DEVICE	L"\\DosDevices\\lkl"
+#define LKL_FS_NAME		L"\\lklvfs"
+#define LKL_DOS_DEVICE	L"\\DosDevices\\lklvfs"
 
 #define CHECK_OUT(cond, S)		{if(cond){status=S;goto try_exit;}}
 #define FLAG_ON(flag, val)		((BOOLEAN)((((flag)&(val))!=0)))

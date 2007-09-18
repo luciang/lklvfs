@@ -77,9 +77,7 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 	ASSERT(file);
 	fcb = (PLKLFCB) file->FsContext;
 	CHECK_OUT(fcb == NULL, STATUS_INVALID_PARAMETER);
-	ccb = (PLKLCCB) file->FsContext2;
-	CHECK_OUT(ccb == NULL, STATUS_INVALID_PARAMETER);
-
+	
 	// volume close
 	if (fcb->id.type == VCB)
 	{
@@ -93,6 +91,8 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 	}
 
 	 CHECK_OUT(!((fcb->id.type == FCB) && (fcb->id.size == sizeof(LKLFCB))), STATUS_INVALID_PARAMETER);
+	 ccb = (PLKLCCB) file->FsContext2;
+	 CHECK_OUT(ccb == NULL, STATUS_INVALID_PARAMETER);
 
 	// acquire fcb resource -  never block in close
 	 if (!ExAcquireResourceExclusiveLite(&(fcb->fcb_resource), FALSE)) {
