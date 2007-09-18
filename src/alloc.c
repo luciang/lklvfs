@@ -73,7 +73,6 @@ PLKLFCB AllocFcb()
 
 void FreeFcb(PLKLFCB fcb)
 {
-	ASSERT(fcb);
 	if(fcb->name.Buffer)
 		ExFreePool(fcb->name.Buffer);
 	ExDeleteResourceLite(&fcb->fcb_resource);
@@ -131,7 +130,6 @@ PLKLCCB AllocCcb()
 
 void CloseAndFreeCcb(PLKLCCB ccb)
 {
-	ASSERT(ccb);
 
 //	sys_close(ccb->fd);
 	ExFreeToNPagedLookasideList(ccb_cachep, ccb);

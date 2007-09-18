@@ -25,11 +25,13 @@ NTSTATUS DDKAPI VfsClose(PDEVICE_OBJECT device, PIRP irp)
 
 	top_level = LklIsIrpTopLevel(irp);
 
-		irp_context = AllocIrpContext(irp, device);
-		ASSERT(irp_context);
+	irp_context = AllocIrpContext(irp, device);
+	if(irp_context == NULL)
+		TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
 
-		status = CommonClose(irp_context, irp);
+	status = CommonClose(irp_context, irp);
 
+try_exit:
 	if (top_level)
 		IoSetTopLevelIrp(NULL);
 
@@ -53,9 +55,12 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 	BOOLEAN						completeIrp = FALSE;
 
 	vcb=(PLKLVCB) irp_context->target_device->DeviceExtension;
-	ASSERT(vcb);
+	CHECK_OUT(vcb == NULL, STATUS_DRIVER_INTERNAL_ERROR);
 	// make shure we have a vcb here
-	ASSERT(vcb->id.type == VCB && vcb->id.size == sizeof(LKLVCB));
+	CHECK_OUT(!(vcb->id.type == VCB && vcb->id.size == sizeof(LKLVCB)), STATUS_INVALID_PARAMETER);
+
+	stack_location = IoGetCurrentIrpStackLocation(irp);
+	ASSERT(stack_location);
 
 	// never make a close request block
 	if (!ExAcquireResourceExclusiveLite(&vcb->vcb_resource, FALSE)) {
@@ -67,15 +72,15 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 			vcbResourceAquired = TRUE;
 		}
 
-	stack_location = IoGetCurrentIrpStackLocation(irp);
-	ASSERT(stack_location);
-
 	// file object
 	file = stack_location->FileObject;
 	ASSERT(file);
 	fcb = (PLKLFCB) file->FsContext;
-	ASSERT(fcb);
+	CHECK_OUT(fcb == NULL, STATUS_INVALID_PARAMETER);
 	ccb = (PLKLCCB) file->FsContext2;
+	CHECK_OUT(ccb == NULL, STATUS_INVALID_PARAMETER);
+
+	// volume close
 	if (fcb->id.type == VCB)
 	{
 		DbgPrint("VOLUME CLOSE");
@@ -87,9 +92,9 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 		TRY_RETURN(STATUS_SUCCESS);
 	}
 
-	 ASSERT((fcb->id.type == FCB) && (fcb->id.size == sizeof(LKLFCB)));
+	 CHECK_OUT(!((fcb->id.type == FCB) && (fcb->id.size == sizeof(LKLFCB))), STATUS_INVALID_PARAMETER);
 
-	// acquire fcb resource
+	// acquire fcb resource -  never block in close
 	 if (!ExAcquireResourceExclusiveLite(&(fcb->fcb_resource), FALSE)) {
 			postRequest = TRUE;
 			TRY_RETURN(STATUS_PENDING);
@@ -97,7 +102,6 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 			resource_acquired = &(fcb->fcb_resource);
 
 	// free ccb
-	ASSERT(ccb);
 	RemoveEntryList(&ccb->next);
 
 	CloseAndFreeCcb(ccb);
@@ -105,8 +109,8 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 	file->FsContext2 = NULL;
 
 	// decrement reference count
-	ASSERT(fcb->reference_count);
-	ASSERT(vcb->reference_count);
+	CHECK_OUT(!fcb->reference_count, STATUS_DRIVER_INTERNAL_ERROR);
+	CHECK_OUT(!vcb->reference_count, STATUS_DRIVER_INTERNAL_ERROR);
 	InterlockedDecrement(&fcb->reference_count);
 	InterlockedDecrement(&vcb->reference_count);
 

@@ -112,8 +112,8 @@ void InitializeFunctionPointers(PDRIVER_OBJECT driver)
 	driver->MajorFunction[IRP_MJ_CLOSE]	= VfsClose;
 	driver->MajorFunction[IRP_MJ_CLEANUP] = VfsCleanup;
 	driver->MajorFunction[IRP_MJ_DIRECTORY_CONTROL] = VfsDirectoryControl;
-	driver->MajorFunction[IRP_MJ_READ] = VfsDummyIrp;
-	driver->MajorFunction[IRP_MJ_WRITE] =VfsDummyIrp;
+	driver->MajorFunction[IRP_MJ_READ] = VfsRead;
+	driver->MajorFunction[IRP_MJ_WRITE] =VfsWrite;
 
 	// these functions are optional
 	driver->MajorFunction[IRP_MJ_FLUSH_BUFFERS] = VfsDummyIrp;

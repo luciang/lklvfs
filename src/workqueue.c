@@ -53,8 +53,9 @@ void DDKAPI LklDequeueRequest(IN PDEVICE_OBJECT device, IN PVOID context)
 
     status = LklDispatchRequest(irp_context);
 
-	IoSetTopLevelIrp(NULL);
 	FsRtlExitFileSystem();
+
+	IoSetTopLevelIrp(NULL);
 
 }
 

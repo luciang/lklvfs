@@ -2,8 +2,9 @@
 #define _LKL_VFS_H
 
 #include <ddk/ntifs.h>
+#include <ddk/ntdddisk.h>
 
-#undef FASTCALL
+//#undef FASTCALL
 
 
 #define LKL_DEVICE		L"\\DosDevices\\F:"
@@ -105,27 +106,23 @@ typedef struct lkl_vcb
 	PDEVICE_OBJECT				vcb_device;				// the volume device object
 	PDEVICE_OBJECT				target_device;			// the physical device object
 	UCHAR						*volume_path;			// volume path
+	DISK_GEOMETRY				disk_geometry;			// info about the disk
+	PARTITION_INFORMATION		partition_information;
 	//more fields here
 
 } LKLVCB, * PLKLVCB;
 
 // fcb flags
-#define	VFS_FCB_IN_INIT						0x00000001
-#define	VFS_FCB_IN_TEARDOWN					0x00000002
-#define	VFS_FCB_PAGE_FILE					0x00000004
-#define	VFS_FCB_DIRECTORY					0x00000008
-#define	VFS_FCB_WRITE_THROUGH				0x00000020
-#define	VFS_FCB_MAPPED						0x00000040
-#define	VFS_FCB_FAST_IO_READ_IN_PROGESS		0x00000080
-#define	VFS_FCB_FAST_IO_WRITE_IN_PROGESS	0x00000100
-#define	VFS_FCB_DELETE_ON_CLOSE				0x00000200
-#define	VFS_FCB_MODIFIED					0x00000400
-#define	VFS_FCB_ACCESSED					0x00000800
-#define	VFS_FCB_READ_ONLY					0x00001000
-#define	VFS_FCB_BLOCKS_INITIALIZED			0x00008000
-#define	VFS_FCB_SPECIAL_FILE				0x00010000
-#define	VFS_FCB_HIDDEN_FILE					0x00020000
-#define	VFS_FCB_NOT_FROM_ZONE				0x80000000
+#define VFS_FCB_PAGE_FILE				0x00000001
+#define VFS_FCB_DELETE_PENDING			0x00000002 // it's a request to delete the file - we need this in clean, to call sys_delete
+#define VFS_FCB_DELETE_ON_CLOSE			0x00000004 // the file can be deleted
+#define	VFS_FCB_DIRECTORY				0x00000008 // the file is a directory 
+#define VFS_FCB_ROOT_DIRECTORY			0x00000010 // need this if it's a request to delete a root dir- this cannot happen
+#define	VFS_FCB_WRITE_THROUGH			0x00000020
+#define	VFS_FCB_MAPPED					0x00000040
+#define	VFS_FCB_MODIFIED				0x00000400
+#define	VFS_FCB_ACCESSED				0x00000800
+#define	VFS_FCB_READ_ONLY				0x00001000 // it's a read-only file so we cannot write or modify it
 
 typedef struct lkl_fcb
 {
@@ -220,12 +217,24 @@ NTSTATUS        CommonCreate(PIRPCONTEXT irp_context, PIRP irp);
 NTSTATUS DDKAPI VfsDirectoryControl(PDEVICE_OBJECT device, PIRP irp);
 NTSTATUS        CommonDirectoryControl(PIRPCONTEXT irp_context, PIRP irp);
 
+/* read.c */
+NTSTATUS DDKAPI VfsRead(PDEVICE_OBJECT device, PIRP irp);
+NTSTATUS		CommonRead(PIRPCONTEXT irp_context, PIRP irp);
+
+/* write.c */
+NTSTATUS DDKAPI VfsWrite(PDEVICE_OBJECT device, PIRP irp);
+
 /* misc.c */
 NTSTATUS DDKAPI VfsDummyIrp(PDEVICE_OBJECT dev_obj, PIRP irp);
 void LklCompleteRequest(PIRP irp, NTSTATUS status);
 BOOLEAN LklIsIrpTopLevel(PIRP irp);
 VOID CharToWchar(PWCHAR Destination, PCHAR Source, ULONG Length);
 void VfsReportError(const char * string);
+NTSTATUS BlockDeviceIoControl(IN PDEVICE_OBJECT DeviceObject, IN ULONG	IoctlCode,
+								   IN PVOID	InputBuffer, IN ULONG InputBufferSize, 
+								   IN OUT PVOID OutputBuffer, IN OUT PULONG OutputBufferSize);
+NTSTATUS LockUserBuffer(IN PIRP Irp, IN ULONG Length, IN LOCK_OPERATION Operation);
+PVOID GetUserBuffer(IN PIRP Irp);
 
 NTSTATUS run_linux_kernel();
 void unload_linux_kernel();

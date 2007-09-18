@@ -42,7 +42,7 @@ NTSTATUS DDKAPI VfsDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 	file = stack_location->FileObject;
 	ASSERT(file);
 	fcb = (PLKLFCB) file->FsContext;
-	ASSERT(fcb);
+	CHECK_OUT(fcb == NULL, STATUS_INVALID_PARAMETER);
 
 	if (fcb->id.type == VCB) {
 		DbgPrint("Device Control");
@@ -50,7 +50,7 @@ NTSTATUS DDKAPI VfsDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 	} else {
 		vcb = fcb->vcb;
 	}
-	ASSERT(vcb);
+	CHECK_OUT(vcb == NULL, STATUS_INVALID_PARAMETER);
 
 	targetDevice = vcb->target_device;
 

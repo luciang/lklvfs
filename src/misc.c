@@ -69,6 +69,82 @@ void VfsReportError(const char * string)
 	DbgPrint("****%s****",string);
 }
 
+// will need this for reading the partition table and find out the partition size
+NTSTATUS BlockDeviceIoControl(IN PDEVICE_OBJECT DeviceObject, IN ULONG	IoctlCode,
+								   IN PVOID	InputBuffer, IN ULONG InputBufferSize, 
+								   IN OUT PVOID OutputBuffer, IN OUT PULONG OutputBufferSize)
+{
+	ULONG			OutputBufferSize2 = 0;
+	KEVENT			Event;
+	PIRP			Irp;
+	IO_STATUS_BLOCK	IoStatus;
+	NTSTATUS		Status;
+
+	ASSERT(DeviceObject != NULL);
+
+	if (OutputBufferSize)
+	{
+		OutputBufferSize2 = *OutputBufferSize;
+	}
+
+	KeInitializeEvent(&Event, NotificationEvent, FALSE);
+
+	Irp = IoBuildDeviceIoControlRequest(IoctlCode, DeviceObject, InputBuffer, InputBufferSize,
+		OutputBuffer, OutputBufferSize2, FALSE, &Event, &IoStatus);
+	if (!Irp) {
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	Status = IoCallDriver(DeviceObject, Irp);
+	if (Status == STATUS_PENDING)
+	{
+		KeWaitForSingleObject(&Event, Executive, KernelMode, FALSE, NULL);
+		Status = IoStatus.Status;
+	}
+	if (OutputBufferSize)
+	{
+		*OutputBufferSize = (ULONG) IoStatus.Information;
+	}
+
+	return Status;
+}
+
+PVOID GetUserBuffer(IN PIRP Irp)
+{
+    if (Irp->MdlAddress) {
+        return MmGetSystemAddressForMdlSafe(Irp->MdlAddress, NormalPagePriority);
+    } else {
+        return Irp->UserBuffer;
+    }
+}
+
+NTSTATUS LockUserBuffer(IN PIRP Irp, IN ULONG Length, IN LOCK_OPERATION Operation)
+{
+    NTSTATUS Status;
+
+    ASSERT(Irp != NULL);
+
+    if (Irp->MdlAddress != NULL) {
+        return STATUS_SUCCESS;
+    }
+    IoAllocateMdl(Irp->UserBuffer, Length, FALSE, FALSE, Irp);
+    if (Irp->MdlAddress == NULL) {
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
+
+//    try
+  //  {
+        MmProbeAndLockPages(Irp->MdlAddress, Irp->RequestorMode, Operation);
+        Status = STATUS_SUCCESS;
+    //}
+   /// except (EXCEPTION_EXECUTE_HANDLER)
+    //{
+      //  IoFreeMdl(Irp->MdlAddress);
+       // Irp->MdlAddress = NULL;
+       // Status = STATUS_INVALID_USER_BUFFER;
+    //}
+    return Status;
+}
 
 void linux_kernel_thread(PVOID p)
 {

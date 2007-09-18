@@ -6,6 +6,8 @@
 * - make a fstat
 * - if abnormal termination call sys_close
 * - uncomment the stat/open related lines
+* - set the flags in the new fcb
+* - create, move, rename file
 */
 
 #include <lklvfs.h>
@@ -112,10 +114,10 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 
 	if (relatedFile) {
 		ccb = (PLKLCCB)(relatedFile->FsContext2);
-		ASSERT(ccb);
+		CHECK_OUT(ccb == NULL, STATUS_DRIVER_INTERNAL_ERROR);
 		fcb = (PLKLFCB)(relatedFile->FsContext);
-		ASSERT(fcb);
-		ASSERT(fcb->id.type == FCB || fcb->id.type == VCB);
+		CHECK_OUT(fcb == NULL, STATUS_DRIVER_INTERNAL_ERROR);
+		CHECK_OUT(fcb->id.type != FCB && fcb->id.type != VCB, STATUS_INVALID_PARAMETER);
 		relatedObjectName = relatedFile->FileName;
 	}
 	// TODO -- check file size
@@ -143,8 +145,9 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	ignoreCaseWhenChecking = ((stack_location->Flags & SL_CASE_SENSITIVE) ? TRUE : FALSE);
 
 	vcb = (PLKLVCB)(irp_context->target_device->DeviceExtension);
-	ASSERT(vcb);
-	ASSERT(vcb->id.type == VCB);
+	CHECK_OUT(vcb == NULL, STATUS_DRIVER_INTERNAL_ERROR);
+	CHECK_OUT(vcb->id.type != VCB, STATUS_INVALID_PARAMETER);
+
 	if (!file->Vpb) {
 		file->Vpb = vcb->vpb;
 	}
@@ -174,8 +177,8 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	// get absolute path name (?!)
 	if(relatedFile) {
 		// validity checks ...
-		// TODO - check if the related fcb is a directory
-
+		// check if the related fcb is a directory
+		CHECK_OUT(!FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY), STATUS_INVALID_PARAMETER);
 		CHECK_OUT((relatedObjectName.Length==0) || (relatedObjectName.Buffer[0]!=L'\\'),
 			STATUS_INVALID_PARAMETER);
 		CHECK_OUT((targetObjectName.Length!=0) && (targetObjectName.Buffer[0]==L'\\'),
@@ -215,7 +218,12 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 		TRY_RETURN(status);
 	}
 
-	// search for the file, and open if it's there
+	if (openTargetDirectory)
+	{
+			//TODO: rename/move
+			TRY_RETURN(STATUS_NOT_IMPLEMENTED);
+	}
+	// open file
 	if (requestedDisposition == FILE_OPEN) {
 		DbgPrint("Open this file");
 		// fd = sys_open ...
@@ -237,16 +245,20 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 		PFSRTL_COMMON_FCB_HEADER header = NULL;
 
 		status = CreateFcb(&newFcb, file, vcb, ino);
+		if (!NT_SUCCESS(status))
+			TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
 		newFcb->name.Length = absolutePathName.Length;
 		newFcb->name.MaximumLength = absolutePathName.MaximumLength;
 		newFcb->name.Buffer = ExAllocatePool(NonPagedPool,absolutePathName.Length);
 		RtlCopyMemory(newFcb->name.Buffer, absolutePathName.Buffer, absolutePathName.Length);
-		if (!NT_SUCCESS(status))
-			TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
 		// complete fcb fields
 		header = &(fcb->common_header);
+		//TODO: set all the flags in the fcb structure
+		//TODO: don't forget to set here VFS_FCB_DIRECTORY if the inode is a directory
 		
-		// get the following info from stat struct
+		if (writeThroughRequested)
+			SET_FLAG(newFcb->flags, VFS_FCB_WRITE_THROUGH);
+		//TODO: get the following info from stat struct
 		header->AllocationSize.QuadPart = 0;
 		header->FileSize.QuadPart = 0; // get st_size
 		header->ValidDataLength.LowPart = 0xFFFFFFFF;
@@ -267,6 +279,7 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 		CHECK_OUT(!NT_SUCCESS(status), status);
 	} else 
 		IoSetShareAccess(desiredAccess, shareAccess, file, &newFcb->share_access);
+
 	// return FILE_OPENED if all's ok
 	if (returnedInformation == -1)
 		returnedInformation = FILE_OPENED;
@@ -307,7 +320,8 @@ PLKLFCB LocateFcbInCore(PLKLVCB vcb, ULONG inode_no)
 		return NULL;
 	for (list_entry = vcb->fcb_list.Flink; list_entry != &vcb->fcb_list; list_entry = list_entry->Flink) {
 		fcb = CONTAINING_RECORD(list_entry, LKLFCB, next);
-		ASSERT(fcb);
+		if(fcb == NULL)
+			return NULL;
 		if (fcb->ino == inode_no)
 			return fcb;
 	}
@@ -329,6 +343,8 @@ NTSTATUS OpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 		// create the root fcb
 
 		status = CreateFcb(&fcb,new_file_obj, vcb, root_ino);
+		if (!NT_SUCCESS(status))
+			TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
 		header = &(fcb->common_header);
 		header->IsFastIoPossible = FastIoIsNotPossible;
 		header->Resource = &(fcb->fcb_resource);
@@ -337,13 +353,14 @@ NTSTATUS OpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 		header->FileSize.QuadPart = 0; // get st_size
 		header->ValidDataLength.LowPart = 0xFFFFFFFF;
 		header->ValidDataLength.HighPart = 0x7FFFFFFF;
-		if (!NT_SUCCESS(status))
-			TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
+
+		SET_FLAG(fcb->flags, VFS_FCB_DIRECTORY);
+		SET_FLAG(fcb->flags, VFS_FCB_ROOT_DIRECTORY);
 	}
-	ASSERT(fcb);
+	CHECK_OUT(fcb == NULL, STATUS_DRIVER_INTERNAL_ERROR);
 
 	status = CreateNewCcb(&ccb, fcb, new_file_obj);
-	ASSERT(ccb);
+	CHECK_OUT(ccb == NULL, STATUS_INSUFFICIENT_RESOURCES);
 	// ccb->fd =fd
 
 	new_file_obj->FsContext = fcb;

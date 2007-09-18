@@ -30,7 +30,7 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 	top_level = LklIsIrpTopLevel(irp);
 
 	vcb = (PLKLVCB)device->DeviceExtension;
-	ASSERT(vcb);
+	CHECK_OUT(vcb == NULL, STATUS_INVALID_PARAMETER);
 	CHECK_OUT(!ExAcquireResourceSharedLite(&vcb->vcb_resource, TRUE),STATUS_PENDING);
 		VcbResourceAcquired = TRUE;
 
@@ -82,7 +82,7 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 
 			Buffer = (PFILE_FS_SIZE_INFORMATION) SystemBuffer;
 			// TODO --fix all this
-			Buffer->TotalAllocationUnits.QuadPart = 0; // mystat.f_blocks
+			Buffer->TotalAllocationUnits.QuadPart = vcb->partition_information.PartitionLength.QuadPart; // / mystat.f_bsize
 			Buffer->AvailableAllocationUnits.QuadPart = 0;// mystat.f_bavail
 			Buffer->SectorsPerAllocationUnit = 1; //mystat.f_bsize/SECTOR_SIZE
 			Buffer->BytesPerSector = SECTOR_SIZE;
@@ -144,7 +144,7 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 
             Buffer = (PFILE_FS_FULL_SIZE_INFORMATION) SystemBuffer;
 
-            Buffer->TotalAllocationUnits.QuadPart = 0; // mystat.f_blocks;
+            Buffer->TotalAllocationUnits.QuadPart = vcb->partition_information.PartitionLength.QuadPart; // / mystat.f_bsize;
             Buffer->CallerAvailableAllocationUnits.QuadPart =
             Buffer->ActualAvailableAllocationUnits.QuadPart = 0; //mystat.f_bavail
 
@@ -184,6 +184,7 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
 	PFILE_OBJECT file = NULL;
 	PLKLFCB fcb = NULL;
 	PLKLCCB ccb = NULL;
+	PLKLVCB vcb = NULL;
 	FILE_INFORMATION_CLASS file_info;
 	ULONG length;
 	//ULONG rc;
@@ -195,11 +196,14 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
 
 	top_level = LklIsIrpTopLevel(irp);
 
+    vcb = (PLKLVCB) device->DeviceExtension;
+   	CHECK_OUT(vcb == NULL, STATUS_INVALID_PARAMETER);
+    CHECK_OUT(vcb->id.type != VCB || vcb->id.size != sizeof(LKLVCB), STATUS_INVALID_PARAMETER);
 	stack_location = IoGetCurrentIrpStackLocation(irp);
 	file = stack_location->FileObject;
-	ASSERT(file);
+	CHECK_OUT(file == NULL, STATUS_INVALID_PARAMETER);
 	fcb = (PLKLFCB) file->FsContext;
-	ASSERT(fcb);
+	CHECK_OUT(fcb == NULL, STATUS_INVALID_PARAMETER);
 
 	if (!FLAG_ON(fcb->flags, VFS_FCB_PAGE_FILE)) {
 		if(!ExAcquireResourceSharedLite(&fcb->fcb_resource, TRUE)) {
@@ -211,7 +215,7 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
 	}
 
 	ccb = (PLKLCCB) file->FsContext2;
-	ASSERT(ccb);
+	CHECK_OUT(vcb == NULL, STATUS_INVALID_PARAMETER);
 
 	file_info = stack_location->Parameters.QueryFile.FileInformationClass;
 	length = stack_location->Parameters.QueryFile.Length;

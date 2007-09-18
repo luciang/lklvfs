@@ -1,7 +1,7 @@
 HERE=$(PWD)
 INC=$(HERE)/../inc
 
-LKLVFS_SRC =init.c fscontrol.c devcontrol.c dircontrol.c misc.c alloc.c create.c close.c cleanup.c fastIo.c geninfo.c cmcallbacks.c workqueue.c
+LKLVFS_SRC =init.c fscontrol.c devcontrol.c dircontrol.c misc.c alloc.c create.c close.c cleanup.c fastIo.c geninfo.c cmcallbacks.c write.c read.c workqueue.c
 
 lklvfs.sys: $(ASYS) $(INC) 
 	i586-mingw32msvc-gcc -Wall -s -I$(INC) -D_WIN32_WINNT=0x0500 \
