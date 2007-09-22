@@ -1,0 +1,10 @@
+*.o
+.deps
+include/linux
+include/asm
+include/asm-generic
+include/asm-i386
+lkl
+lklvfs.sys
+*.a
+*~
