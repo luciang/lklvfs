@@ -14,7 +14,7 @@ BOOLEAN LklIsIrpTopLevel(PIRP irp)
 	return FALSE;
 }
 
-void LklCompleteRequest(PIRP irp, NTSTATUS status)
+VOID LklCompleteRequest(PIRP irp, NTSTATUS status)
 {
 	if (irp != NULL) {
 		if (!NT_SUCCESS(status) && FLAG_ON(irp->Flags, IRP_INPUT_OPERATION))
@@ -62,7 +62,61 @@ VOID CharToWchar(PWCHAR Destination, PCHAR Source, ULONG Length)
 	}
 }
 
-void VfsReportError(const char * string)
+PSTR VfsCopyUnicodeStringToZcharUnixPath(PUNICODE_STRING src)
+{
+	int i, length;
+	PSTR dest;
+
+	length = src->Length / sizeof(WCHAR);
+	dest = ExAllocatePoolWithTag(NonPagedPool, length + 1, 'RHCU');
+	if (!dest)
+		return NULL;
+	for (i = 0; i < length; i++) {
+		dest[i] = (char)src->Buffer[i];
+		if (dest[i] == '\\') dest[i] = '/';
+	}
+	dest[length] = 0;
+
+	return dest;
+}
+
+PSTR CopyAppendUStringToZcharUnixPath(PUNICODE_STRING src, PSTR rel_name, USHORT name_length)
+{
+     int i, length;
+     PSTR dest;
+     
+     length = src->Length / sizeof(WCHAR);
+     dest = ExAllocatePoolWithTag(NonPagedPool, length + name_length + 1, 'RHCU');
+     if(!dest)
+      return NULL;
+     for (i = 0; i < length; i++) {
+		dest[i] = (char)src->Buffer[i];
+		if (dest[i] == '\\') dest[i] = '/';
+	}
+	if(dest[length-1] != '/') {
+	  dest[length] = '/';
+	  length++;
+   }
+    for(i = 0; i < name_length; i++) {
+          dest[length+i] = (char) rel_name[i];
+    }
+    dest[length+name_length] = 0;
+    
+    return dest;
+}
+
+void VfsCopyUnicodeString(PUNICODE_STRING dest, PUNICODE_STRING src)
+{
+	
+	dest->Length = src->Length;
+	dest->MaximumLength = src->MaximumLength = src->Length+2;
+	dest->Buffer = ExAllocatePoolWithTag(NonPagedPool, dest->MaximumLength, 'RAHC');
+    if(dest->Buffer == NULL)
+       return;
+	RtlCopyUnicodeString(dest, src);
+}
+
+VOID VfsReportError(const char * string)
 {
 	//todo - make a nice log entry (but for now we stick with DbgPrint)
 
@@ -146,44 +200,5 @@ NTSTATUS LockUserBuffer(IN PIRP Irp, IN ULONG Length, IN LOCK_OPERATION Operatio
     return Status;
 }
 
-void linux_kernel_thread(PVOID p)
-{
-	/*NTSTATUS status=STATUS_SUCCESS;
-	struct linux_native_operations lnops;
-	RtlZeroMemory(&lnops, sizeof(struct linux_native_operations));
-	lnops.panic_blink=linux_panic_blink;
-	lnops.mem_init=linux_mem_init;
-	lnops.main=linux_main;
-	threads_init(&lnops);
 
-	__try
-	{
-		DbgPrint("Start linux kernel");
-		linux_start_kernel(&lnops, "root=%d:0", FILE_DISK_MAJOR);
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-		{
-			status = GetExceptionCode();
-		}
-		if(!NT_SUCCESS(status))
-			DbgPrint("Exception %x in starting linux kernel", status);
-	*/
-}
 
-void unload_linux_kernel()
-{
-	//TODO - cleanup the mess
-
-	// and finally...
-	//ZwClose(lklfsd.linux_thread);
-}
-
-NTSTATUS run_linux_kernel()
-{
-	NTSTATUS status=STATUS_SUCCESS;
-	//status = PsCreateSystemThread(&lklfsd.linux_thread, (ACCESS_MASK)0L,
-	//			NULL, NULL, NULL, &linux_kernel_thread, NULL);
-
-	return status;
-
-}

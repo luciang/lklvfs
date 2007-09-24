@@ -1,16 +1,13 @@
 /*
 * create /open
 * put all TODOs here:
-* - open file with sys_open and check if fd is valid
 * - check file size
-* - make a fstat
-* - if abnormal termination call sys_close
-* - uncomment the stat/open related lines
-* - set the flags in the new fcb
+* - set the rest of the flags in the new fcb
 * - create, move, rename file
 */
 
 #include <lklvfs.h>
+#include <linux/stat.h>
 
 NTSTATUS OpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 							  PIO_SECURITY_CONTEXT security_context, PFILE_OBJECT new_file_obj);
@@ -21,8 +18,6 @@ NTSTATUS DDKAPI VfsCreate(PDEVICE_OBJECT device, PIRP irp)
 	NTSTATUS status = STATUS_SUCCESS;
 	PIRPCONTEXT irp_context;
 	BOOLEAN top_level;
-
-	DbgPrint("OPEN");
 
 	ASSERT(device);
 	ASSERT(irp);
@@ -89,10 +84,13 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	PLKLVCB						vcb;
 	PLKLFCB						newFcb = NULL;
 	PLKLCCB						newCcb = NULL;
-	ULONG						fd;
-	ULONG						ino = -1;
+	LONG						fd = -1;
+	LONG						ino = -1;
+	LONG                        rc;
 	ULONG						returnedInformation = -1;
-
+    PSTR                        unixPath;
+    STATS                       mystat;
+    
 	absolutePathName.Buffer = NULL;
 	absolutePathName.Length = absolutePathName.MaximumLength = 0;
 	fd = -1;
@@ -170,7 +168,7 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 		file->FsContext = vcb;
 		vcb->reference_count++;
 		irp->IoStatus.Information = FILE_OPENED;
-		DbgPrint("VOLUME OPEN");
+
 		TRY_RETURN(STATUS_SUCCESS);
 	}
 	CHECK_OUT(openByFileId, STATUS_ACCESS_DENIED);
@@ -196,13 +194,8 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	}
 	else {
 		CHECK_OUT(targetObjectName.Buffer[0] != L'\\', STATUS_INVALID_PARAMETER);
-		absolutePathName.MaximumLength = targetObjectName.Length;
-		absolutePathName.Buffer = ExAllocatePool(NonPagedPool, absolutePathName.MaximumLength);
+	    VfsCopyUnicodeString(&absolutePathName, &targetObjectName);
 		CHECK_OUT(!absolutePathName.Buffer, STATUS_INSUFFICIENT_RESOURCES);
-
-		RtlZeroMemory(absolutePathName.Buffer, absolutePathName.MaximumLength);
-		RtlCopyMemory((void *)(absolutePathName.Buffer), (void *)(targetObjectName.Buffer), targetObjectName.Length);
-		absolutePathName.Length = targetObjectName.Length;
 	}
 
 	// for now we allow to open only the root directory
@@ -211,7 +204,6 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 			(requestedDisposition == FILE_OVERWRITE) ||
 			(requestedDisposition == FILE_OVERWRITE_IF), STATUS_FILE_IS_A_DIRECTORY);
 
-		DbgPrint("OPEN ROOT");
 		status = OpenRootDirectory(vcb, irp, shareAccess, securityContext, file);
 		if(NT_SUCCESS(status))
 			irp->IoStatus.Information = FILE_OPENED;
@@ -225,47 +217,59 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	}
 	// open file
 	if (requestedDisposition == FILE_OPEN) {
-		DbgPrint("Open this file");
-		// fd = sys_open ...
-
-		//CHECK_OUT((fd<0), STATUS_OBJECT_PATH_NOT_FOUND);
-		TRY_RETURN(STATUS_OBJECT_PATH_NOT_FOUND);
+		unixPath =  VfsCopyUnicodeStringToZcharUnixPath(&absolutePathName);
+ 	    DbgPrint("Open file %s", unixPath);
+		CHECK_OUT(unixPath == NULL, STATUS_INSUFFICIENT_RESOURCES);
+		
+		if (directoryOnlyRequested)
+		   fd = sys_open_wrapper(unixPath, O_RDONLY|O_DIRECTORY|O_LARGEFILE, 0666);
+        else
+           fd = sys_open_wrapper(unixPath, O_RDONLY|O_LARGEFILE, 0666);
+        ExFreePool(unixPath);
+        CHECK_OUT((fd<=0), STATUS_OBJECT_PATH_NOT_FOUND);
 	}
 	else
 	{
 		// create and ... ?
-		DbgPrint("Create/overwrite this file");
-		TRY_RETURN(STATUS_ACCESS_DENIED);
+		unixPath =  VfsCopyUnicodeStringToZcharUnixPath(&absolutePathName);
+		CHECK_OUT(unixPath == NULL, STATUS_INSUFFICIENT_RESOURCES);
+		DbgPrint("Create/overwrite file %s", unixPath);
+	    ExFreePool(unixPath);
+		TRY_RETURN(STATUS_NOT_IMPLEMENTED);
 	}
-
-	// fstat to get inode number, size, etc. : ino = 
+	
+	// fstat to get inode number, size, etc.
+	rc = sys_newfstat_wrapper(fd, &mystat);
+    CHECK_OUT(rc<0, STATUS_OBJECT_PATH_NOT_FOUND);
+  
+    ino = mystat.st_ino;
+    
 	newFcb = LocateFcbInCore(vcb,ino);
+	
 	if (!newFcb) {
 		// create the fcb
-		PFSRTL_COMMON_FCB_HEADER header = NULL;
 
-		status = CreateFcb(&newFcb, file, vcb, ino);
+		status = CreateFcb(&newFcb, file, vcb, ino, mystat.st_blksize * mystat.st_blocks, mystat.st_size);
 		if (!NT_SUCCESS(status))
 			TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
-		newFcb->name.Length = absolutePathName.Length;
-		newFcb->name.MaximumLength = absolutePathName.MaximumLength;
-		newFcb->name.Buffer = ExAllocatePool(NonPagedPool,absolutePathName.Length);
-		RtlCopyMemory(newFcb->name.Buffer, absolutePathName.Buffer, absolutePathName.Length);
+	    VfsCopyUnicodeString(&newFcb->name, &absolutePathName);
+		CHECK_OUT(!absolutePathName.Buffer, STATUS_INSUFFICIENT_RESOURCES);
 		// complete fcb fields
-		header = &(fcb->common_header);
-		//TODO: set all the flags in the fcb structure
-		//TODO: don't forget to set here VFS_FCB_DIRECTORY if the inode is a directory
-		
+		//set all the flags in the fcb structure
 		if (writeThroughRequested)
 			SET_FLAG(newFcb->flags, VFS_FCB_WRITE_THROUGH);
-		//TODO: get the following info from stat struct
-		header->AllocationSize.QuadPart = 0;
-		header->FileSize.QuadPart = 0; // get st_size
-		header->ValidDataLength.LowPart = 0xFFFFFFFF;
-		header->ValidDataLength.HighPart = 0x7FFFFFFF;
+        if(deleteOnCloseSpecified)
+            SET_FLAG(newFcb->flags, VFS_FCB_DELETE_ON_CLOSE);
+            
+        //set here VFS_FCB_DIRECTORY if the inode is a directory
+        if( S_ISDIR(mystat.st_mode)) {
+            SET_FLAG(newFcb->flags, VFS_FCB_DIRECTORY);
+            }
 	}
 	//allocate a new ccb
 	status = CreateNewCcb(&newCcb, newFcb, file);
+	CHECK_OUT(!NT_SUCCESS(status), status);
+	
 	newCcb->fd = fd;
 	// complete file object fields
 	file->FsContext = newFcb;
@@ -274,23 +278,26 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	file->SectionObjectPointer = &newFcb->section_object;
 	file->Vpb = vcb->vpb;
 	// check access
+    // TODO:  i have a bug here and dunno what it is
+
 	if (newFcb->handle_count > 0) {
 		status = IoCheckShareAccess(desiredAccess, shareAccess, file, &newFcb->share_access, TRUE);
 		CHECK_OUT(!NT_SUCCESS(status), status);
 	} else 
 		IoSetShareAccess(desiredAccess, shareAccess, file, &newFcb->share_access);
-
+   
 	// return FILE_OPENED if all's ok
 	if (returnedInformation == -1)
-		returnedInformation = FILE_OPENED;
+		returnedInformation = FILE_OPENED;       
 try_exit:
 	//don't forget to free used resources !!!!
 
 	if (absolutePathName.Buffer != NULL)
 		ExFreePool(absolutePathName.Buffer);
-
+  
 	if(acquiredVcb)
 		RELEASE(&vcb->vcb_resource);
+		
 	if(status != STATUS_PENDING) {
 		if(NT_SUCCESS(status)) {
 			//If write-through was requested, then mark the file
@@ -298,15 +305,29 @@ try_exit:
 			if (writeThroughRequested)
 				file->Flags |= FO_WRITE_THROUGH ;
 		}
-		if(!FLAG_ON(irp_context->flags, VFS_IRP_CONTEXT_EXCEPTION)) {
-			irp->IoStatus.Information = returnedInformation;
-			FreeIrpContext(irp_context);
-			// complete the IRP
-			LklCompleteRequest(irp,status);
-		}
+		else {
+             // we failed in a way or another
+             if( fd >0) {
+                 sys_close_wrapper(fd);
+                 if(newCcb)
+                     newCcb->fd = -1;
+             }
+             if(newFcb) {
+                 RemoveEntryList(&newFcb->next);
+                 FreeFcb(newFcb);
+             }
+             if(newCcb) {
+                 RemoveEntryList(&newCcb->next);
+                 CloseAndFreeCcb(newCcb);
+             }
+        }
+		irp->IoStatus.Information = returnedInformation;
+		FreeIrpContext(irp_context);
+		// complete the IRP
+		LklCompleteRequest(irp,status);
 	}
 	else
-		DbgPrint("Post request");
+		LklPostRequest(irp_context, irp);
 
 	return status;
 }
@@ -320,11 +341,10 @@ PLKLFCB LocateFcbInCore(PLKLVCB vcb, ULONG inode_no)
 		return NULL;
 	for (list_entry = vcb->fcb_list.Flink; list_entry != &vcb->fcb_list; list_entry = list_entry->Flink) {
 		fcb = CONTAINING_RECORD(list_entry, LKLFCB, next);
-		if(fcb == NULL)
-			return NULL;
 		if (fcb->ino == inode_no)
 			return fcb;
 	}
+	
 	return NULL;
 }
 
@@ -334,34 +354,35 @@ NTSTATUS OpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 	PLKLFCB fcb = NULL;
 	PLKLCCB ccb = NULL;
 	NTSTATUS status = STATUS_SUCCESS;
-	PFSRTL_COMMON_FCB_HEADER header = NULL;
 	USHORT root_ino;
-
-	root_ino = 0; // temporary --> open root directory and stat to get inode number, if all it's ok then:
+    LONG fd = -1;
+    struct stat mystat;
+    
+	root_ino = 0; 
+    //open root directory
+    fd = sys_open_wrapper("/", O_RDONLY|O_LARGEFILE|O_DIRECTORY, 0);
+    CHECK_OUT(fd < 0, STATUS_OBJECT_PATH_NOT_FOUND);
+    // stat to get some info about inode
+    sys_newfstat_wrapper(fd, &mystat);
+    root_ino = mystat.st_ino;
+    
 	fcb = LocateFcbInCore(vcb, root_ino);
 	if (!fcb) {
 		// create the root fcb
 
-		status = CreateFcb(&fcb,new_file_obj, vcb, root_ino);
+		status = CreateFcb(&fcb,new_file_obj, vcb, root_ino, mystat.st_blksize * mystat.st_blocks, mystat.st_size);
 		if (!NT_SUCCESS(status))
 			TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
-		header = &(fcb->common_header);
-		header->IsFastIoPossible = FastIoIsNotPossible;
-		header->Resource = &(fcb->fcb_resource);
-		header->PagingIoResource = &(fcb->paging_resource);
-		header->AllocationSize.QuadPart = 0; // get from stat: st_blksize * st_blocks
-		header->FileSize.QuadPart = 0; // get st_size
-		header->ValidDataLength.LowPart = 0xFFFFFFFF;
-		header->ValidDataLength.HighPart = 0x7FFFFFFF;
 
 		SET_FLAG(fcb->flags, VFS_FCB_DIRECTORY);
 		SET_FLAG(fcb->flags, VFS_FCB_ROOT_DIRECTORY);
+	
 	}
 	CHECK_OUT(fcb == NULL, STATUS_DRIVER_INTERNAL_ERROR);
 
 	status = CreateNewCcb(&ccb, fcb, new_file_obj);
 	CHECK_OUT(ccb == NULL, STATUS_INSUFFICIENT_RESOURCES);
-	// ccb->fd =fd
+    ccb->fd =fd;
 
 	new_file_obj->FsContext = fcb;
 	new_file_obj->FsContext2 = ccb;
@@ -370,8 +391,11 @@ NTSTATUS OpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 	new_file_obj->Vpb = vcb->vpb;
 
 try_exit:
-		;
-		// if abnormal termination then close on fd
 
+		// if abnormal termination then close on fd
+		if(!NT_SUCCESS(status)) {
+            if(fd >0)
+                  sys_close_wrapper(fd);
+        }
 	return status;
 }

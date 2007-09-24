@@ -2,7 +2,6 @@
 * read dispatch routine
 * TODOs: 
 * - volume read
-* - uncomment sys_read/lseek lines
 **/
 
 #include <lklvfs.h>
@@ -12,8 +11,6 @@ NTSTATUS DDKAPI VfsRead(PDEVICE_OBJECT device, PIRP irp)
 	NTSTATUS status = STATUS_SUCCESS;
 	PIRPCONTEXT irp_context;
 	BOOLEAN top_level;
-
-	DbgPrint("READ");
 
 	ASSERT(device);
 	ASSERT(irp);
@@ -69,7 +66,7 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 
 	file = stack_location->FileObject;
 	CHECK_OUT(file == NULL, STATUS_INVALID_PARAMETER);
-
+   
 	// If this happens to be an MDL read complete request, then
 	// there is not much processing here.
 	if (FLAG_ON(stack_location->MinorFunction,IRP_MN_COMPLETE)) {
@@ -84,6 +81,7 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 
 	// If this is a request at IRQL DISPATCH_LEVEL, then post the request
 	if (FLAG_ON(stack_location->MinorFunction,IRP_MN_DPC)) {
+        DbgPrint("post request");
 		complete_irp = FALSE;
 		TRY_RETURN(STATUS_PENDING);
 	}
@@ -113,14 +111,17 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 
 	// We are asked to do a volume read
 	if (fcb->id.type == VCB) {
+                     	DbgPrint("VOLUME READ");
 		//TODO: We need to send this on to the disk driver after validation of the offset and length.
 		TRY_RETURN(STATUS_INVALID_PARAMETER);
 	}
-	CHECK_OUT(fcb->id.type != FCB || fcb->id.size !=sizeof(LKLFCB), STATUS_INVALID_PARAMETER);
-	CHECK_OUT(FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY), STATUS_INVALID_PARAMETER);
-	ccb = file->FsContext2;
-	CHECK_OUT(ccb->id.type != FCB || ccb->id.size !=sizeof(LKLCCB), STATUS_INVALID_PARAMETER);
 
+	CHECK_OUT(fcb->id.type != FCB || fcb->id.size !=sizeof(LKLFCB), STATUS_INVALID_PARAMETER);
+	CHECK_OUT(ccb->id.type != CCB || ccb->id.size !=sizeof(LKLCCB), STATUS_INVALID_PARAMETER);
+
+ 	DbgPrint("READ");
+ 	 // BUG! BUG! BUG!
+ 	  TRY_RETURN(STATUS_INVALID_PARAMETER);
 	// Obtain any resources that are appropriate to ensure consistency of data.
 	 if (!pagingIo)
         {
@@ -134,7 +135,7 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
                 TRY_RETURN(STATUS_PENDING);
             paging_resource_acq = TRUE;
         }
-	
+ 
 	// Determine whether the byte range specified by the caller is valid, and if not,
 	// return an appropriate error code to the caller.
 	if ((byte_offset.QuadPart + (LONGLONG)length) > fcb->common_header.FileSize.QuadPart )
@@ -177,7 +178,7 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 			}
 			// update the offset
 			file->CurrentByteOffset.QuadPart = byte_offset.QuadPart + numberBytesRead;
-			// sys_lseek(ccb->fd, byte_offset.QuadPart + numberBytesRead);
+		//	sys_lseek_wrapper(ccb->fd, byte_offset.QuadPart + numberBytesRead, 0);
 
 	}
 	else {
@@ -187,11 +188,12 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 			//	;
 			//	else {
 					// lseek
-					// lseek(ccb->fd,byte_offset.LowPart, SEEK_SET); 
+					// sys_lseek_wrapper(ccb->fd,byte_offset.LowPart, 0); 
 			//	}
 			}
-
-		//numberBytesRead = sys_read(ccb->fd, userBuffer, length);
+        DbgPrint("Read from DISK");
+		//numberBytesRead = sys_read_wrapper(ccb->fd, userBuffer, length);
+	
 	}
 
 	if(numberBytesRead >=0) {
@@ -226,6 +228,7 @@ try_exit:
 		LklCompleteRequest(irp, status);
 		FreeIrpContext(irp_context);
 	}
+	DbgPrint("Finished read");
 	return status;
 }
 

@@ -20,7 +20,7 @@ BOOLEAN DDKAPI VfsAcqLazyWrite(PVOID context, BOOLEAN wait)
 //
 //	release from lazy write
 //
-void DDKAPI VfsRelLazyWrite(PVOID context)
+VOID DDKAPI VfsRelLazyWrite(PVOID context)
 {
 	PLKLFCB	fcb = (PLKLFCB)context;
 
@@ -46,7 +46,7 @@ BOOLEAN DDKAPI VfsAcqReadAhead(PVOID context, BOOLEAN wait)
 //
 //	release from read ahead
 //
-void DDKAPI VfsRelReadAhead(PVOID context)
+VOID DDKAPI VfsRelReadAhead(PVOID context)
 {
 	PLKLFCB fcb = (PLKLFCB) context;
 

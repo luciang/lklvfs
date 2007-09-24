@@ -1,12 +1,11 @@
 /**
 * allocation related stuff
-* put all TODOs here:
-* - uncomment the sys_close line from CloseAndFreeCcb
+* put all TODOs here: -
 **/
 
 #include<lklvfs.h>
 
-void CreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
+VOID CreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 					  PLARGE_INTEGER alloc_size)
 {
 	NTSTATUS status = STATUS_SUCCESS;
@@ -19,16 +18,17 @@ void CreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 	vcb->id.size = sizeof(LKLVCB);
 
 	status = ExInitializeResourceLite(&(vcb->vcb_resource));
-	ASSERT(NT_SUCCESS(status));
+	if(!NT_SUCCESS(status))
+		return;
 
 	vcb->target_device = target_dev;
 	vcb->vcb_device = volume_dev;
 	vcb->vpb = vpb;
 
 	InitializeListHead(&(vcb->fcb_list));
-	InitializeListHead(&(vcb->next_notify_irp));
 
-	KeInitializeMutex(&(vcb->notify_irp_mutex), 0);
+	FsRtlNotifyInitializeSync(&vcb->notify_irp_mutex);
+    InitializeListHead(&vcb->next_notify_irp);
 
 	vcb->common_header.AllocationSize.QuadPart = alloc_size->QuadPart;
 	vcb->common_header.FileSize.QuadPart = alloc_size->QuadPart;
@@ -43,8 +43,15 @@ void CreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 	SET_FLAG(vcb->flags, VFS_VCB_FLAGS_VCB_INITIALIZED);
 }
 
-void FreeVcb(PLKLVCB vcb)
+VOID FreeVcb(PLKLVCB vcb)
 {
+     if(vcb == NULL)
+            return;
+     if(vcb->id.type != VCB || vcb->id.size !=sizeof(LKLVCB))
+            return;
+     if(!FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VCB_INITIALIZED))
+            return;
+            
 	ClearVpbFlag(vcb->vpb, VPB_MOUNTED);
 
 	ExAcquireResourceExclusiveLite(&lklfsd.global_resource, TRUE);
@@ -52,7 +59,7 @@ void FreeVcb(PLKLVCB vcb)
 	RELEASE(&lklfsd.global_resource);
 
 	ExDeleteResourceLite(&vcb->vcb_resource);
-
+   	FsRtlNotifyUninitializeSync(&vcb->notify_irp_mutex);
 	IoDeleteDevice(vcb->vcb_device);
 }
 
@@ -63,49 +70,62 @@ PLKLFCB AllocFcb()
 	fcb = ExAllocateFromNPagedLookasideList(fcb_cachep);
 	if (!fcb)
 		return NULL;
-
+ 
 	RtlZeroMemory(fcb, sizeof(LKLFCB));
 	fcb->id.type = FCB;
 	fcb->id.size = sizeof(LKLFCB);
-
+	fcb->flags = 0;
+	
 	return fcb;
 }
 
-void FreeFcb(PLKLFCB fcb)
+VOID FreeFcb(PLKLFCB fcb)
 {
-	if(fcb->name.Buffer)
-		ExFreePool(fcb->name.Buffer);
+     if(fcb == NULL)
+            return;
+	RtlFreeUnicodeString(&fcb->name);
+
 	ExDeleteResourceLite(&fcb->fcb_resource);
 	ExDeleteResourceLite(&fcb->paging_resource);
 	ExFreeToNPagedLookasideList(fcb_cachep, fcb);
 }
 
 
-NTSTATUS CreateFcb(PLKLFCB *new_fcb, PFILE_OBJECT file_obj, PLKLVCB vcb, ULONG ino)
+NTSTATUS CreateFcb(PLKLFCB *new_fcb, PFILE_OBJECT file_obj, PLKLVCB vcb, ULONG ino,
+                   ULONG allocation, ULONG file_size)
 {
 	NTSTATUS status = STATUS_SUCCESS;
 	PLKLFCB fcb = NULL;
 
-	ASSERT(vcb);
-	ASSERT(file_obj);
+	CHECK_OUT(!vcb, STATUS_INSUFFICIENT_RESOURCES);
+	CHECK_OUT(!file_obj, STATUS_INSUFFICIENT_RESOURCES);
 
 	fcb = AllocFcb();
 	CHECK_OUT(!fcb, STATUS_INSUFFICIENT_RESOURCES);
 
 	ExInitializeResourceLite(&(fcb->fcb_resource));
 	ExInitializeResourceLite(&(fcb->paging_resource));
-
-	fcb->flags = 0;
+    
 	fcb->vcb = vcb;
+	fcb->name.Length = 0;
+	fcb->name.Buffer = NULL;
 	fcb->common_header.NodeTypeCode = (USHORT)FCB;
 	fcb->common_header.NodeByteSize = sizeof(PLKLFCB);
 	fcb->common_header.IsFastIoPossible = FastIoIsNotPossible;
 	fcb->common_header.Resource = &(fcb->fcb_resource);
 	fcb->common_header.PagingIoResource = &(fcb->paging_resource);
-
+	fcb->common_header.ValidDataLength.LowPart = 0xFFFFFFFF;
+	fcb->common_header.ValidDataLength.HighPart = 0x7FFFFFFF;
+	fcb->common_header.AllocationSize.QuadPart = allocation; // get from stat: st_blksize * st_blocks
+	fcb->common_header.FileSize.QuadPart = file_size; // get st_size
+	
+	fcb->section_object.DataSectionObject = NULL;
+	fcb->section_object.SharedCacheMap = NULL;
+	fcb->section_object.ImageSectionObject = NULL;
+	
+    InitializeListHead(&(fcb->ccb_list));
+    
 	InsertTailList(&(vcb->fcb_list), &(fcb->next));
-
-	InitializeListHead(&(fcb->ccb_list));
 
 	*new_fcb = fcb;
 try_exit:
@@ -128,10 +148,13 @@ PLKLCCB AllocCcb()
 	return ccb;
 }
 
-void CloseAndFreeCcb(PLKLCCB ccb)
+VOID CloseAndFreeCcb(PLKLCCB ccb)
 {
-
-//	sys_close(ccb->fd);
+     	if(ccb == NULL)
+        	return;
+	if(ccb->fd >0)
+		sys_close_wrapper(ccb->fd);
+	RtlFreeUnicodeString(&ccb->search_pattern);
 	ExFreeToNPagedLookasideList(ccb_cachep, ccb);
 }
 
@@ -145,7 +168,9 @@ NTSTATUS CreateNewCcb(PLKLCCB *new_ccb, PLKLFCB fcb, PFILE_OBJECT file_obj)
 	ccb->fcb = fcb;
 	ccb->file_obj = file_obj;
 	ccb->offset.QuadPart = 0;
-
+    ccb->search_pattern.Length = 0;
+    ccb->search_pattern.Buffer = NULL;
+    
 	InterlockedIncrement(&fcb->reference_count);
 	InterlockedIncrement(&fcb->handle_count);
 	InterlockedIncrement(&fcb->vcb->reference_count);
@@ -198,7 +223,7 @@ PIRPCONTEXT AllocIrpContext(PIRP irp, PDEVICE_OBJECT target_device)
 	return irp_context;
 }
 
-void FreeIrpContext(PIRPCONTEXT irp_context)
+VOID FreeIrpContext(PIRPCONTEXT irp_context)
 {
 	ASSERT(irp_context);
 	ExFreeToNPagedLookasideList(irp_context_cachep, irp_context);

@@ -1,6 +1,6 @@
 /*
 * close & it's friends
-* TODOs: -
+* TODOs
 */
 #include <lklvfs.h>
 
@@ -103,7 +103,6 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 
 	// free ccb
 	RemoveEntryList(&ccb->next);
-
 	CloseAndFreeCcb(ccb);
 
 	file->FsContext2 = NULL;
@@ -120,6 +119,7 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 		RELEASE(resource_acquired);
 		resource_acquired = NULL;
 		FreeFcb(fcb);
+		file->FsContext = NULL;
 	}
 
 	completeIrp = TRUE;
@@ -138,8 +138,9 @@ try_exit:
 		LklCompleteRequest(irp, status);
 		FreeIrpContext(irp_context);
 	}
-	if (freeVcb)
+	if (freeVcb) {
 		FreeVcb(vcb);
-
+		lklfsd.mounted_volume = NULL;
+    }
 	return status;
 }

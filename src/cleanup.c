@@ -1,6 +1,6 @@
 /**
 * cleanup stuff
-* put all TODOs here: ?
+* put all TODOs here:
 **/
 #include <lklvfs.h>
 
@@ -92,6 +92,7 @@ NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp)
 	//invoking the flush call explicitly could be useful
 	if (file->PrivateCacheMap != NULL)
 				CcFlushCache(file->SectionObjectPointer, NULL, 0, &iosb);
+
 	//uninitialize cache map even if caching hasn't been initialized
 	CcUninitializeCacheMap(file, NULL, NULL);
 
@@ -110,7 +111,7 @@ NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp)
 	/*If the cleanup operation is for a directory, we have to complete any
 	pending notify IRPs for the file object.*/
 /*	if (FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY))
-       FsRtlNotifyCleanup(vcb->notify_irp_mutex, &vcb->next_notify_irp, file->FsContext2);
+       FsRtlNotifyCleanup(&vcb->notify_irp_mutex, &vcb->next_notify_irp, file->FsContext2);
 */
 try_exit:
 

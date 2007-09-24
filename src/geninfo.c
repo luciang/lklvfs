@@ -1,10 +1,11 @@
 /**
 * querry/set information about files, volumes, etc.
 * put all TODOs here:
-* -uncomment lines related to stat & review statfs & fstat
+* -set information
 **/
 
 #include <lklvfs.h>
+#include <linux/magic.h>
 
 #define SECTOR_SIZE 512
 #define TEMP_FS_NAME "LKLVFS"
@@ -21,10 +22,10 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 	PVOID SystemBuffer;
 	BOOLEAN VcbResourceAcquired = FALSE;
 	BOOLEAN top_level;
-	//ULONG rc;
-	//struct statfs mystat;
+	LONG rc;
+	UINT fs_length;
+    STATFS mystat;
 
-	DbgPrint("Querry Volume Information");
 	FsRtlEnterFileSystem();
 
 	top_level = LklIsIrpTopLevel(irp);
@@ -39,7 +40,7 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 	Length = stack_location->Parameters.QueryVolume.Length;
 	SystemBuffer = irp->AssociatedIrp.SystemBuffer;
 	RtlZeroMemory(SystemBuffer, Length);
-	// TODO -- make a statfs here! rc = sys_statfs(vcb->volume_path, &mystat);
+	rc = sys_statfs_wrapper(vcb->volume_path, &mystat);
 	switch (FsInformationClass)
     {
 		case FileFsVolumeInformation:
@@ -63,7 +64,7 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 			if (Length < RequiredLength) {
 				irp->IoStatus.Information = sizeof(FILE_FS_VOLUME_INFORMATION);
 				status = STATUS_BUFFER_OVERFLOW;
-				DbgPrint("FileFsVolumeInformation");
+			//	DbgPrint("FileFsVolumeInformation");
 				TRY_RETURN(status);
 			}
 
@@ -81,14 +82,14 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 				STATUS_INFO_LENGTH_MISMATCH);
 
 			Buffer = (PFILE_FS_SIZE_INFORMATION) SystemBuffer;
-			// TODO --fix all this
-			Buffer->TotalAllocationUnits.QuadPart = vcb->partition_information.PartitionLength.QuadPart; // / mystat.f_bsize
-			Buffer->AvailableAllocationUnits.QuadPart = 0;// mystat.f_bavail
-			Buffer->SectorsPerAllocationUnit = 1; //mystat.f_bsize/SECTOR_SIZE
+
+			Buffer->TotalAllocationUnits.QuadPart = mystat.f_blocks;
+			Buffer->AvailableAllocationUnits.QuadPart = mystat.f_bavail;
+			Buffer->SectorsPerAllocationUnit = mystat.f_bsize/SECTOR_SIZE;
 			Buffer->BytesPerSector = SECTOR_SIZE;
 			irp->IoStatus.Information = sizeof(FILE_FS_SIZE_INFORMATION);
 			status = STATUS_SUCCESS;
-			DbgPrint("FileFsSizeInformation");
+		//	DbgPrint("FileFsSizeInformation");
 			TRY_RETURN(status);
 		}
 		case FileFsDeviceInformation:
@@ -104,7 +105,7 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 			Buffer->Characteristics = vcb->target_device->Characteristics;
 			irp->IoStatus.Information = sizeof(FILE_FS_DEVICE_INFORMATION);
 			status = STATUS_SUCCESS;
-			DbgPrint("FileFsDeviceInformation");
+		//	DbgPrint("FileFsDeviceInformation");
 			TRY_RETURN(status)
 		}
 		case FileFsAttributeInformation:
@@ -117,20 +118,37 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 			Buffer = (PFILE_FS_ATTRIBUTE_INFORMATION) SystemBuffer;
 
 			Buffer->FileSystemAttributes = FILE_CASE_SENSITIVE_SEARCH | FILE_CASE_PRESERVED_NAMES;
-			Buffer->MaximumComponentNameLength = 255;
-			// TODO -- get the real file system name and fill in the info
-			Buffer->FileSystemNameLength = TEMP_FS_LENGTH * sizeof(WCHAR);
+			Buffer->MaximumComponentNameLength = mystat.f_namelen;
+
+				switch ( mystat.f_type) {
+                   case EXT3_SUPER_MAGIC:
+                  	    Buffer->FileSystemNameLength = 4 * sizeof(WCHAR);
+                        CharToWchar(Buffer->FileSystemName, "ext3",4);
+                        fs_length = 4;
+                        break;
+                   case REISERFS_SUPER_MAGIC:
+                         Buffer->FileSystemNameLength = 8 * sizeof(WCHAR);
+                         CharToWchar(Buffer->FileSystemName, "Reiserfs",8);
+                         fs_length = 8;
+                         break;
+                   default:
+                         Buffer->FileSystemNameLength = TEMP_FS_LENGTH * sizeof(WCHAR);
+                         CharToWchar(Buffer->FileSystemName, TEMP_FS_NAME,TEMP_FS_LENGTH);
+                         fs_length = TEMP_FS_LENGTH;
+                         break;  
+            }
+            
 			RequiredLength = sizeof(FILE_FS_ATTRIBUTE_INFORMATION) +
-			   TEMP_FS_LENGTH  * sizeof(WCHAR) - sizeof(WCHAR);
+            fs_length  * sizeof(WCHAR) - sizeof(WCHAR);
 			if (Length < RequiredLength)
 			{
 				irp->IoStatus.Information =
 					sizeof(FILE_FS_ATTRIBUTE_INFORMATION);
 				status = STATUS_BUFFER_OVERFLOW;
-				DbgPrint("FileFsAttributeInformation");
+		//		DbgPrint("FileFsAttributeInformation");
 			TRY_RETURN(status);
 			}
-			CharToWchar(Buffer->FileSystemName, TEMP_FS_NAME,TEMP_FS_LENGTH);
+		
 			irp->IoStatus.Information = RequiredLength;
 			status = STATUS_SUCCESS;
 			TRY_RETURN(status);
@@ -144,15 +162,14 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 
             Buffer = (PFILE_FS_FULL_SIZE_INFORMATION) SystemBuffer;
 
-            Buffer->TotalAllocationUnits.QuadPart = vcb->partition_information.PartitionLength.QuadPart; // / mystat.f_bsize;
+            Buffer->TotalAllocationUnits.QuadPart = mystat.f_blocks;
             Buffer->CallerAvailableAllocationUnits.QuadPart =
-            Buffer->ActualAvailableAllocationUnits.QuadPart = 0; //mystat.f_bavail
-
-            Buffer->SectorsPerAllocationUnit = 1; // mystat.f_bsize / SECTOR_SIZE
+            Buffer->ActualAvailableAllocationUnits.QuadPart = mystat.f_bavail;
+            Buffer->SectorsPerAllocationUnit = mystat.f_bsize/SECTOR_SIZE;
             Buffer->BytesPerSector = SECTOR_SIZE;
             irp->IoStatus.Information = sizeof(FILE_FS_FULL_SIZE_INFORMATION);
             status = STATUS_SUCCESS;
-			DbgPrint("FileFsFullSizeInformation");
+		//	DbgPrint("FileFsFullSizeInformation");
             TRY_RETURN(status);
 		}
 	default:
@@ -177,7 +194,7 @@ FsRtlExitFileSystem();
 
 NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
 {
-	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	NTSTATUS status = STATUS_SUCCESS;
 	BOOLEAN top_level;
 	BOOLEAN fcbResourceAcquired = FALSE;
 	PIO_STACK_LOCATION	stack_location;
@@ -185,13 +202,13 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
 	PLKLFCB fcb = NULL;
 	PLKLCCB ccb = NULL;
 	PLKLVCB vcb = NULL;
+	PSTR name;
 	FILE_INFORMATION_CLASS file_info;
 	ULONG length;
-	//ULONG rc;
+	LONG rc;
 	PVOID buffer;
-	//struct stat mystat;
+	STATS mystat;
 
-	DbgPrint("Querry Information");
 	FsRtlEnterFileSystem();
 
 	top_level = LklIsIrpTopLevel(irp);
@@ -206,71 +223,108 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
 	CHECK_OUT(fcb == NULL, STATUS_INVALID_PARAMETER);
 
 	if (!FLAG_ON(fcb->flags, VFS_FCB_PAGE_FILE)) {
-		if(!ExAcquireResourceSharedLite(&fcb->fcb_resource, TRUE)) {
-			status = STATUS_PENDING;
-			TRY_RETURN(status);
+		CHECK_OUT(!ExAcquireResourceSharedLite(&fcb->fcb_resource, TRUE), STATUS_PENDING) {
 		}
 		
 		fcbResourceAcquired = TRUE;
 	}
 
 	ccb = (PLKLCCB) file->FsContext2;
-	CHECK_OUT(vcb == NULL, STATUS_INVALID_PARAMETER);
+	CHECK_OUT(ccb == NULL, STATUS_INVALID_PARAMETER);
 
 	file_info = stack_location->Parameters.QueryFile.FileInformationClass;
 	length = stack_location->Parameters.QueryFile.Length;
 	buffer = irp->AssociatedIrp.SystemBuffer;
-	// stat on ccb->fd (statfd) rc = sys_newfstat(ccb->fd, &mystat);
-
+	name = VfsCopyUnicodeStringToZcharUnixPath(&fcb->name);
+	DbgPrint("Query information on file: %s", name);
+	rc = sys_newfstat_wrapper(ccb->fd, &mystat);
+    ExFreePool(name);
+    CHECK_OUT(rc<0, STATUS_INVALID_PARAMETER);
+    
 	switch (file_info) {
 
 	case FileBasicInformation:
 		{
-		/*PFILE_BASIC_INFORMATION basic_buffer;
+		PFILE_BASIC_INFORMATION basic_buffer;
 		CHECK_OUT(length < sizeof(FILE_BASIC_INFORMATION),
 				STATUS_INFO_LENGTH_MISMATCH);
 		basic_buffer = (PFILE_BASIC_INFORMATION) buffer;
-		RtlSecondsSince1970ToTime (mystat.st_ctime, & basic_buffer->CreationTime);
-		RtlSecondsSince1970ToTime (mystat.st_atime, & basic_buffer->LastAccessTime);
-		RtlSecondsSince1970ToTime (mystat.st_mtime, & basic_buffer->LastWriteTime);
-		RtlSecondsSince1970ToTime (mystat.st_mtime, & basic_buffer->ChangeTime);
+		
+		RtlSecondsSince1970ToTime (mystat.st_ctime, &basic_buffer->CreationTime);
+		RtlSecondsSince1970ToTime (mystat.st_atime, &basic_buffer->LastAccessTime);
+		RtlSecondsSince1970ToTime (mystat.st_mtime, &basic_buffer->LastWriteTime);
+		RtlSecondsSince1970ToTime (mystat.st_mtime, &basic_buffer->ChangeTime);
 		basic_buffer->FileAttributes = FILE_ATTRIBUTE_NORMAL;
-		if (S_ISDIR(mystat.st_mode)) 
+		if (FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY)) 
 			SET_FLAG(basic_buffer->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
-		irp->IoStatus.Information = sizeof(FILE_BASIC_INFORMATION);*/
-		TRY_RETURN(status);
+		irp->IoStatus.Information = sizeof(FILE_BASIC_INFORMATION);
+		
+		DbgPrint("File basic");
+		TRY_RETURN(STATUS_SUCCESS);
 		}
 	case FileStandardInformation:
-		/*PFILE_STANDARD_INFORMATION	st_buffer;
-         CHECK_OUT(Length < sizeof(FILE_STANDARD_INFORMATION),
+         {
+	     PFILE_STANDARD_INFORMATION	st_buffer;
+         CHECK_OUT(length < sizeof(FILE_STANDARD_INFORMATION),
 				STATUS_INFO_LENGTH_MISMATCH);
+				
 		st_buffer = (PFILE_STANDARD_INFORMATION) buffer;
-		st_buffer->AllocationSize.QuadPart = mystat.st_size;
+		st_buffer->AllocationSize.QuadPart = mystat.st_blksize * mystat.st_blocks;
 		st_buffer->EndOfFile.QuadPart = mystat.st_size;
 		st_buffer->NumberOfLinks = mystat.st_nlink;
 		st_buffer->DeletePending = FLAG_ON(fcb->flags, VFS_FCB_DELETE_ON_CLOSE);
-		st_buffer->Directory = S_ISDIR(mystat.st_mode);
-		irp->IoStatus.Information = sizeof(FILE_STANDARD_INFORMATION);*/
-		TRY_RETURN(status);
+		st_buffer->Directory = FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY);
+		irp->IoStatus.Information = sizeof(FILE_STANDARD_INFORMATION);
+		
+		DbgPrint("File standard information");
+		TRY_RETURN(STATUS_SUCCESS); 
+    }
+    case FileNetworkOpenInformation:
+         {
+        PFILE_NETWORK_OPEN_INFORMATION nt_buffer;
+        CHECK_OUT(length < sizeof(FILE_STANDARD_INFORMATION),
+			STATUS_INFO_LENGTH_MISMATCH);
+			
+	    nt_buffer = (PFILE_NETWORK_OPEN_INFORMATION) buffer;
+     	RtlSecondsSince1970ToTime (mystat.st_ctime, &nt_buffer->CreationTime);
+	    RtlSecondsSince1970ToTime (mystat.st_atime, &nt_buffer->LastAccessTime);
+	    RtlSecondsSince1970ToTime (mystat.st_mtime, &nt_buffer->LastWriteTime);
+	    RtlSecondsSince1970ToTime (mystat.st_mtime, &nt_buffer->ChangeTime);
+	    
+	    nt_buffer->FileAttributes = FILE_ATTRIBUTE_NORMAL;
+	    if (FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY)) 
+		   SET_FLAG(nt_buffer->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
+		nt_buffer->AllocationSize.QuadPart = mystat.st_blksize * mystat.st_blocks;
+	    nt_buffer->EndOfFile.QuadPart = mystat.st_size; 
+        irp->IoStatus.Information = sizeof(FILE_NETWORK_OPEN_INFORMATION);
+        
+		DbgPrint("File network open information");
+	    TRY_RETURN(STATUS_SUCCESS);  
+         }
 	case FileInternalInformation:
 		{
 		PFILE_INTERNAL_INFORMATION in_buffer;
 		CHECK_OUT(length < sizeof(FILE_INTERNAL_INFORMATION),
 		STATUS_INFO_LENGTH_MISMATCH);
+		
+        DbgPrint("File internal information");
 		in_buffer = (PFILE_INTERNAL_INFORMATION) buffer;
 		in_buffer->IndexNumber.QuadPart = fcb->ino; 
 		irp->IoStatus.Information = sizeof(FILE_INTERNAL_INFORMATION);
-		TRY_RETURN(status);
+		
+		TRY_RETURN(STATUS_SUCCESS);
 		}
 	case FileEaInformation:
 		{
 		PFILE_EA_INFORMATION ea_buffer;
 		CHECK_OUT(length < sizeof(FILE_EA_INFORMATION),
 				STATUS_INFO_LENGTH_MISMATCH);
+
 		ea_buffer = (PFILE_EA_INFORMATION) buffer;
 		ea_buffer->EaSize = 0;
 		irp->IoStatus.Information = sizeof(FILE_EA_INFORMATION);
-		TRY_RETURN(status);
+		
+		TRY_RETURN(STATUS_SUCCESS);
 		}
 	case FileNameInformation:
 		{
@@ -278,38 +332,47 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
 		CHECK_OUT(length < sizeof(FILE_NAME_INFORMATION) +
                 fcb->name.Length - sizeof(WCHAR),
 				STATUS_INFO_LENGTH_MISMATCH);
+				
+		DbgPrint("File name");
 		name_buffer = (PFILE_NAME_INFORMATION) buffer;
 		name_buffer->FileNameLength = fcb->name.Length;
 		RtlCopyMemory(name_buffer->FileName, fcb->name.Buffer, fcb->name.Length);
-		irp->IoStatus.Information = sizeof(FILE_NAME_INFORMATION) +
-                fcb->name.Length - sizeof(WCHAR);
-		TRY_RETURN(status);
+		irp->IoStatus.Information = sizeof(FILE_NAME_INFORMATION) + fcb->name.Length - sizeof(WCHAR);
+                
+		TRY_RETURN(STATUS_SUCCESS);
 		}
 	case FileAttributeTagInformation:
 		{
-		/*PFILE_ATTRIBUTE_TAG_INFORMATION	atr_buffer;
+		PFILE_ATTRIBUTE_TAG_INFORMATION	atr_buffer;
+		
+		DbgPrint("File atr tag");
 		atr_buffer = (PFILE_ATTRIBUTE_TAG_INFORMATION) buffer;
 		atr_buffer->FileAttributes = FILE_ATTRIBUTE_NORMAL;
-		if (S_ISDIR(mystat.st_mode)) {
-			SET_FLAG(Buffer->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
+		if (FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY)) {
+			SET_FLAG(atr_buffer->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
 		}
-		Buffer->ReparseTag = 0; 
-		irp->IoStatus.Information = sizeof(FILE_ATTRIBUTE_TAG_INFORMATION);*/
-		TRY_RETURN(status);
+		atr_buffer->ReparseTag = 0; 
+		irp->IoStatus.Information = sizeof(FILE_ATTRIBUTE_TAG_INFORMATION);
+		
+		TRY_RETURN(STATUS_SUCCESS);
 		}
 	case FilePositionInformation:
 		{
+
         PFILE_POSITION_INFORMATION pos_buffer;
         CHECK_OUT(length < sizeof(FILE_POSITION_INFORMATION),
 			STATUS_INFO_LENGTH_MISMATCH);
+			
+         DbgPrint("File position info");
         pos_buffer = (PFILE_POSITION_INFORMATION) buffer;
 		pos_buffer->CurrentByteOffset = file->CurrentByteOffset;
         irp->IoStatus.Information = sizeof(FILE_POSITION_INFORMATION);
-		TRY_RETURN(status);
+        
+		TRY_RETURN(STATUS_SUCCESS);
 		}
 	case FileAllInformation:
 		{
-		/*PFILE_ALL_INFORMATION     all_buffer;
+		PFILE_ALL_INFORMATION     all_buffer;
 		PFILE_BASIC_INFORMATION     basic_info;
 		PFILE_STANDARD_INFORMATION  standard_info;
 		PFILE_INTERNAL_INFORMATION  int_info;
@@ -318,8 +381,8 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
 		PFILE_NAME_INFORMATION      name_info;
 
 		CHECK_OUT(length<sizeof(FILE_ALL_INFORMATION), STATUS_INFO_LENGTH_MISMATCH);
-
-		all_buffer = (PFILE_ALL_INFORMATION) SystemBuffer;
+        DbgPrint("File all info class");
+		all_buffer = (PFILE_ALL_INFORMATION) buffer;
 		basic_info = &all_buffer->BasicInformation;
 		standard_info = &all_buffer->StandardInformation;
 		int_info = &all_buffer->InternalInformation;
@@ -335,13 +398,12 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
 		RtlSecondsSince1970ToTime (mystat.st_atime, & basic_info->LastAccessTime);
 		RtlSecondsSince1970ToTime (mystat.st_mtime, & basic_info->LastWriteTime);
 		RtlSecondsSince1970ToTime (mystat.st_mtime, & basic_info->ChangeTime);
-		standard_info->AllocationSize.QuadPart = mystat.st_size;
+		standard_info->AllocationSize.QuadPart = mystat.st_blksize * mystat.st_blocks;
 		standard_info->EndOfFile.QuadPart = mystat.st_size;
 		standard_info->NumberOfLinks = mystat.st_nlink;
 		standard_info->DeletePending = FLAG_ON(fcb->flags, VFS_FCB_DELETE_ON_CLOSE);
-		standard_info->Directory = S_ISDIR(mystat.st_mode);
-		if (length < sizeof(FILE_ALL_INFORMATION) +
-                fcb->name.Length - sizeof(WCHAR))
+		standard_info->Directory = FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY);
+		if (length < sizeof(FILE_ALL_INFORMATION) + fcb->name.Length - sizeof(WCHAR))
             {
                 irp->IoStatus.Information = sizeof(FILE_ALL_INFORMATION);
                 status = STATUS_BUFFER_OVERFLOW;
@@ -349,20 +411,25 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
             }
 
         name_info->FileNameLength = fcb->name.Length;
-        RtlCopyMemory(name_info->FileName, fcb->name.Buffer, fcb->FileName.Length);
+        RtlCopyMemory(name_info->FileName, fcb->name.Buffer, fcb->name.Length);
 
         irp->IoStatus.Information = sizeof(FILE_ALL_INFORMATION) +
 						fcb->name.Length - sizeof(WCHAR);
-		*/
-	TRY_RETURN(status);
+
+	    TRY_RETURN(STATUS_SUCCESS);
 		}
 	default:
+        DbgPrint("Invalid info class");
 		status = STATUS_INVALID_INFO_CLASS;
 	}
+	
 try_exit:
 	if(fcbResourceAcquired)
 		RELEASE(&fcb->fcb_resource);
-	LklCompleteRequest(irp, status);
+		
+    ASSERT(status!=STATUS_PENDING);
+    
+    LklCompleteRequest(irp, status);
 
     if (top_level)
     	IoSetTopLevelIrp(NULL);
@@ -375,22 +442,83 @@ try_exit:
 
 NTSTATUS DDKAPI VfsSetInformation(PDEVICE_OBJECT device ,PIRP irp)
 {
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
-    BOOLEAN top_level;
-    
-    DbgPrint("Set Information");
-    FsRtlEnterFileSystem();
-    
-    top_level = LklIsIrpTopLevel(irp);
-    
-    //TODO
-    
-    LklCompleteRequest(irp, status);
-    
-    if (top_level)
-    	IoSetTopLevelIrp(NULL);
-    
-    FsRtlExitFileSystem();
+	NTSTATUS	            status = STATUS_UNSUCCESSFUL;
+	PFILE_OBJECT	        FileObject;
+	PLKLFCB                 Fcb;
+	PLKLCCB                 Ccb;
+	PIO_STACK_LOCATION	    IrpSp;
+	FILE_INFORMATION_CLASS	FileInformationClass;
+	ULONG		            Length;
+	PVOID		            SystemBuffer;
+	BOOLEAN		            FcbResourceAcquired = FALSE;
+	BOOLEAN                 top_level = FALSE;
+
+	FsRtlEnterFileSystem();
+
+	top_level = LklIsIrpTopLevel(irp);
+
+	IrpSp = IoGetCurrentIrpStackLocation(irp);
+	FileObject = IrpSp->FileObject;
+	Fcb = (PLKLFCB) FileObject->FsContext;
+	CHECK_OUT(!Fcb, STATUS_INVALID_PARAMETER);
+
+	if (!FLAG_ON(Fcb->flags, VFS_FCB_PAGE_FILE))
+	{
+		if(!ExAcquireResourceSharedLite(&Fcb->fcb_resource, TRUE)) {
+			status = STATUS_PENDING;
+			goto try_exit;
+		}
+		
+		FcbResourceAcquired = TRUE;
+	}
+
+	Ccb = (PLKLCCB)FileObject->FsContext2;
+	CHECK_OUT(!Ccb, STATUS_INVALID_PARAMETER);
+
+	FileInformationClass = IrpSp->Parameters.QueryFile.FileInformationClass;
+	Length = IrpSp->Parameters.QueryFile.Length;
+    SystemBuffer = irp->AssociatedIrp.SystemBuffer;
+	RtlZeroMemory(SystemBuffer, Length);
+
+	switch(FileInformationClass){
+                                 
+	 case FilePositionInformation:
+       {
+         PFILE_POSITION_INFORMATION Buffer = (PFILE_POSITION_INFORMATION) SystemBuffer;
+         CHECK_OUT(Length < sizeof(FILE_POSITION_INFORMATION), STATUS_INFO_LENGTH_MISMATCH);
+         
+		 sys_lseek_wrapper(Ccb->fd, Buffer->CurrentByteOffset.QuadPart, 0); 
+		 
+		 irp->IoStatus.Information = sizeof(FILE_POSITION_INFORMATION);
+		 TRY_RETURN(STATUS_SUCCESS);
+      }
+    case FileBasicInformation:
+     {
+        PFILE_BASIC_INFORMATION Buffer = (PFILE_BASIC_INFORMATION) SystemBuffer;
+        CHECK_OUT(Length < sizeof(FILE_BASIC_INFORMATION), STATUS_INFO_LENGTH_MISMATCH);
+        
+	    // do nothing for now, because we mounted a read-only fs
+	    
+	    irp->IoStatus.Information = sizeof(FILE_BASIC_INFORMATION);
+        TRY_RETURN(STATUS_SUCCESS);
+     }
+	default:
+		status = STATUS_INVALID_INFO_CLASS;
+	}
+
+try_exit:
+		
+	if (FcbResourceAcquired)
+		RELEASE(&Fcb->fcb_resource);
+		
+	ASSERT(status != STATUS_PENDING);
+
+	LklCompleteRequest(irp, status);
+
+	if (top_level)
+		IoSetTopLevelIrp(NULL);
+
+	FsRtlExitFileSystem();
 
 	return status;
 }

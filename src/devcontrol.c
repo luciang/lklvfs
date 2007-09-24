@@ -15,7 +15,7 @@ NTSTATUS DDKAPI VfsDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 	BOOLEAN top_level;
 	ULONG ioctl = 0;
 	PIO_STACK_LOCATION stack_location = NULL;
-//	PIO_STACK_LOCATION next_stack_location = NULL;
+	PIO_STACK_LOCATION next_stack_location = NULL;
 	BOOLEAN complete_request = FALSE;
 	PLKLVCB vcb = NULL;
 	PLKLFCB fcb = NULL;
@@ -45,7 +45,6 @@ NTSTATUS DDKAPI VfsDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 	CHECK_OUT(fcb == NULL, STATUS_INVALID_PARAMETER);
 
 	if (fcb->id.type == VCB) {
-		DbgPrint("Device Control");
 		vcb = (PLKLVCB) fcb;
 	} else {
 		vcb = fcb->vcb;
@@ -56,8 +55,8 @@ NTSTATUS DDKAPI VfsDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 
 	// Pass on the IOCTL to the driver below
 	complete_request = FALSE;
-	//next_stack_location = IoGetNextIrpStackLocation(irp);
-	//*next_stack_location = *stack_location;
+	next_stack_location = IoGetNextIrpStackLocation(irp);
+	*next_stack_location = *stack_location;
 	IoSetCompletionRoutine(irp, LklIoctlCompletion, NULL, TRUE, TRUE, TRUE);
 	status = IoCallDriver(targetDevice, irp);
 
@@ -79,8 +78,6 @@ NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp)
 {
 	NTSTATUS status = STATUS_SUCCESS;
 	BOOLEAN acq_resource = FALSE;
-
-	DbgPrint("PREPARE TO UNLOAD CALLED");
 
 	CHECK_OUT(device != lklfsd.device, STATUS_INVALID_DEVICE_REQUEST);
 

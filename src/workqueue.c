@@ -33,7 +33,7 @@ NTSTATUS LklDispatchRequest(PIRPCONTEXT irp_context)
 }
 
 
-void DDKAPI LklDequeueRequest(IN PDEVICE_OBJECT device, IN PVOID context)
+VOID DDKAPI LklDequeueRequest(IN PDEVICE_OBJECT device, IN PVOID context)
 {
 	NTSTATUS status;
 	PIRPCONTEXT irp_context;
