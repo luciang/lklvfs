@@ -4,11 +4,13 @@ AS=$(CROSS)as
 DLLTOOL=$(CROSS)dlltool
 HERE=$(PWD)
 
-LKL_SOURCE=../linux-2.6
+LKL_SOURCE=$(HERE)/../linux-2.6
 LKL=lkl/vmlinux
 
 OBJS=$(patsubst %.c,%.o,$(shell find $(1) -type f -name '*.c')) 
 DEPS=$(patsubst %.c,.deps/%.d,$(shell find $(1) -type f -name '*.c')) 
+
+INC=include/asm include/asm-generic include/asm-i386 include/linux
 
 all: lklvfs.sys
 
@@ -34,29 +36,30 @@ lkl/.config: $(LKL_SOURCE)
 
 lkl/vmlinux: lkl/.config
 	cd $(LKL_SOURCE) && \
-	$(MAKE) O=$(HERE)/lkl $@` ARCH=lkl CROSS_COMPILE=i586-mingw32msvc- \
+	$(MAKE) O=$(HERE)/lkl ARCH=lkl CROSS_COMPILE=i586-mingw32msvc- \
 		LKL_DRIVERS=$(HERE)/drivers/ \
 		FILE_DISK=y \
 		STDIO_CONSOLE=y FILE_DISK_MAJOR=42 \
 		vmlinux
 
-INC=include/asm include/asm-generic include/asm-i386 include/linux
 
 CFLAGS=-Iinclude -D_WIN32_WINNT=0x0500 -DFILE_DISK_MAJOR=42
 
 lib/%.a: lib/%.def
 	$(DLLTOOL) --as=$(AS) -k --output-lib $@ --def $^
 
-lklvfs.sys: $(INC) $(call OBJS,src) lib/libmingw-patch.a lkl/vmlinux
-	i586-mingw32msvc-gcc -Wall -s lkl/vmlinux \
-	$^ -Wl,--subsystem,native -Wl,--entry,_DriverEntry@8 \
+LKLVFS_SRC = $(call OBJS,src) lib/libmingw-patch.a lkl/vmlinux
+
+lklvfs.sys: $(INC) $(LKLVFS_SRC)
+	i586-mingw32msvc-gcc -Wall -s \
+	$(LKLVFS_SRC) -Wl,--subsystem,native -Wl,--entry,_DriverEntry@8 \
 	-nostartfiles -Llib -lmingw-patch -lntoskrnl -lhal -nostdlib \
 	-shared -o $@ 
 
 clean: 
 	rm -f lklvfs.sys include/asm include/asm-i386 \
 	include/asm-generic include/linux $(call OBJS,src) lib/*.a
-	rm -rf .deps 
+	rm -rf .deps lkl
 
 
 .deps/%.d: %.c
