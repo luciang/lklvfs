@@ -8,3 +8,5 @@ lkl
 lklvfs.sys
 *.a
 *~
+TAGS
+*.o.cmd
