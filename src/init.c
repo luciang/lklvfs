@@ -73,6 +73,7 @@ NTSTATUS DDKAPI DriverEntry(IN PDRIVER_OBJECT driver,IN PUNICODE_STRING reg_path
 		RtlInitUnicodeString(&dos_name, LKL_DOS_DEVICE);
 		IoCreateSymbolicLink(&dos_name, &device_name);
 
+		run_linux_kernel();
 try_exit:
 
 	if (!NT_SUCCESS(status))

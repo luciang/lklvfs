@@ -7,10 +7,11 @@ HERE=$(PWD)
 LKL_SOURCE=$(HERE)/../linux-2.6
 LKL=lkl/vmlinux
 
-OBJS=$(patsubst %.c,%.o,$(shell find $(1) -type f -name '*.c')) 
-DEPS=$(patsubst %.c,.deps/%.d,$(shell find $(1) -type f -name '*.c')) 
+SRCS=$(shell find $(1) -type f -name '*.c')
+OBJS=$(patsubst %.c,%.o,$(call SRCS,$(1))) 
+DEPS=$(patsubst %.c,.deps/%.d,$(call SRCS,$(1))) 
 
-INC=include/asm include/asm-generic include/asm-i386 include/linux
+INC=include/asm include/asm-generic include/asm-i386 include/linux include/drivers
 
 all: lklvfs.sys
 
@@ -34,16 +35,13 @@ lkl/.config: $(LKL_SOURCE)
 	-mkdir `dirname $@`
 	cp $^/arch/lkl/defconfig $@
 
-lkl/vmlinux: lkl/.config
+lkl/vmlinux: lkl/.config $(call SRCS,drivers)
 	cd $(LKL_SOURCE) && \
 	$(MAKE) O=$(HERE)/lkl ARCH=lkl CROSS_COMPILE=i586-mingw32msvc- \
 		LKL_DRIVERS=$(HERE)/drivers/ \
-		FILE_DISK=y \
-		STDIO_CONSOLE=y FILE_DISK_MAJOR=42 \
 		vmlinux
 
-
-CFLAGS=-Iinclude -D_WIN32_WINNT=0x0500 -DFILE_DISK_MAJOR=42
+CFLAGS=-Iinclude -D_WIN32_WINNT=0x0500 -Wno-multichar
 
 lib/%.a: lib/%.def
 	$(DLLTOOL) --as=$(AS) -k --output-lib $@ --def $^
@@ -60,6 +58,13 @@ clean:
 	rm -f lklvfs.sys include/asm include/asm-i386 \
 	include/asm-generic include/linux $(call OBJS,src) lib/*.a
 	rm -rf .deps lkl
+
+TAGS: $(call SRCS,src) $(call SRCS,drivers) Makefile
+	cd $(LKL_SOURCE) && \
+	$(MAKE) O=$(HERE)/lkl ARCH=lkl CROSS_COMPILE=i586-mingw32msvc- TAGS 
+	etags -f TAGS.tmp $^ 
+	cat lkl/TAGS TAGS.tmp > TAGS
+	rm TAGS.tmp
 
 
 .deps/%.d: %.c

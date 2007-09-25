@@ -88,8 +88,10 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 	CHECK_OUT(!NT_SUCCESS(status), status);
 	
 	lklfsd.mounted_volume = volume_device;
-		// try a linux mount
-	status = run_linux_kernel(); // if this fails, then we fail to mount the volume
+	// try a linux mount if this fails, then we fail to mount
+	// the volume
+	status=linux_mount_disk(((PLKLVCB)volume_device->DeviceExtension)->target_device, "diskname", "ext3");
+
 	((PLKLVCB)volume_device->DeviceExtension)->volume_path = "/";
 	CHECK_OUT(!NT_SUCCESS(status), status);
 	rc = sys_statfs_wrapper("/", &my_stat);
