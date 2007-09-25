@@ -15,6 +15,15 @@ typedef struct statfs*        PSTATFS;
 typedef struct linux_dirent   DIRENT;
 typedef struct linux_dirent*  PDIRENT;
 
+// used to store all the info that we'll need for unmount
+typedef struct lin_dev {
+      UCHAR mnt[255];
+      UCHAR devno_str[255];
+      USHORT mnt_length;
+      USHORT devno_str_length;
+      PVOID ldisk;
+} LINDEV, *PLINDEV;
+
 NTSTATUS InitializeSysWrappers();
 void FreeSysWrapperResources();
 

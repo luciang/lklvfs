@@ -31,6 +31,10 @@ include/linux:
 	-mkdir `dirname $@`
 	ln -s $(LKL_SOURCE)/include/linux include/linux
 
+include/drivers:
+	-mkdir `dirname $@`
+	ln -s $(HERE)/drivers include/drivers
+
 lkl/.config: $(LKL_SOURCE)
 	-mkdir `dirname $@`
 	cp $^/arch/lkl/defconfig $@
@@ -56,7 +60,7 @@ lklvfs.sys: $(INC) $(LKLVFS_SRC)
 
 clean: 
 	rm -f lklvfs.sys include/asm include/asm-i386 \
-	include/asm-generic include/linux $(call OBJS,src) lib/*.a
+	include/asm-generic include/linux include/drivers $(call OBJS,src) lib/*.a
 	rm -rf .deps lkl
 	rm -f drivers/*.o drivers/.*.o.cmd drivers/built-in.o 
 

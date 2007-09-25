@@ -1,8 +1,9 @@
 /**
 * file system control operations
 * TODOs:
-* - to fix: for now we allow only one mounted fs at a time
+* FIXME: for now we allow only ext3 to be mounted: keep a list, and try a mount for each fs from the list
 * FIXME (BUG) when I try to mount the fs the second time, it gets me a BSOD
+* FIXME (BUG) when I open a file, and then unmount the volume it crashes -> see CcCacheFlush( )
 **/
 
 #include <lklvfs.h>
@@ -49,15 +50,15 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 {
 	NTSTATUS status = STATUS_SUCCESS;
 	PDEVICE_OBJECT volume_device=NULL;
+	PLKLVCB vcb = NULL;
 	LARGE_INTEGER AllocationSize;
 	ULONG ioctlSize;
+	PSTR dev_name;
     STATFS my_stat;
     ULONG rc;
     
 	CHECK_OUT(dev == lklfsd.device, STATUS_INVALID_DEVICE_REQUEST);
-	//FIXME: we allow only one mounted volume
-	CHECK_OUT(lklfsd.mounted_volume != NULL, STATUS_UNRECOGNIZED_VOLUME);
-	
+
 	CHECK_OUT(FLAG_ON(lklfsd.flags, VFS_UNLOAD_PENDING),STATUS_UNRECOGNIZED_VOLUME);
 	
 	DbgPrint("Mount volume");
@@ -87,18 +88,23 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 		NULL, 0, &((PLKLVCB)volume_device->DeviceExtension)->partition_information, &ioctlSize);
 	CHECK_OUT(!NT_SUCCESS(status), status);
 	
-	lklfsd.mounted_volume = volume_device;
 	// try a linux mount if this fails, then we fail to mount
 	// the volume
-	status=linux_mount_disk(((PLKLVCB)volume_device->DeviceExtension)->target_device, "diskname", "ext3");
-
-	((PLKLVCB)volume_device->DeviceExtension)->volume_path = "/";
+	ExAcquireResourceExclusiveLite(&(lklfsd.global_resource), TRUE);
+	lklfsd.no_mounts++;
+	vcb = (PLKLVCB) volume_device->DeviceExtension;
+	dev_name = CopyStringAppendULong("device", 6, lklfsd.no_mounts);
+	DbgPrint("Mounting device '%s'", dev_name);
+	status=linux_mount_disk(vcb->target_device,dev_name , "ext3", &vcb->linux_device);
+    ExFreePool(dev_name);
+   	RELEASE(&(lklfsd.global_resource));
 	CHECK_OUT(!NT_SUCCESS(status), status);
-	rc = sys_statfs_wrapper("/", &my_stat);
 	
+	rc = sys_statfs_wrapper(vcb->linux_device.mnt, &my_stat);
+
 	vpb->DeviceObject = volume_device;
-	// complete vpb fields from ?? --TODO--
-	#define UNKNOWN_LABEL "unknown_label"
+	// complete vpb fields
+	#define UNKNOWN_LABEL "Local Disk"
 	CharToWchar(vpb->VolumeLabel, UNKNOWN_LABEL , sizeof(UNKNOWN_LABEL));
 	vpb->VolumeLabel[sizeof(UNKNOWN_LABEL)] = 0;
 	vpb->VolumeLabelLength = sizeof(UNKNOWN_LABEL)*2;
@@ -108,11 +114,12 @@ try_exit:
 
 		if(!NT_SUCCESS(status))
 		{
+            lklfsd.no_mounts--;
 			if(volume_device) {
-                 FreeVcb((PLKLVCB) volume_device->DeviceExtension);
+                FreeVcb((PLKLVCB) volume_device->DeviceExtension);
 				IoDeleteDevice(volume_device);
             }
-			lklfsd.mounted_volume = NULL;
+
 		}
 
 	return status;
@@ -244,7 +251,7 @@ VOID PurgeFile(PLKLFCB fcb, BOOLEAN flush_before_purge)
 	IO_STATUS_BLOCK iosb;
 
 	ASSERT(fcb);
-	// BUG! BUG! BUG!
+
 	if (flush_before_purge)
 		CcFlushCache(&fcb->section_object, NULL, 0, &iosb);
 	if (fcb->section_object.ImageSectionObject)
@@ -380,7 +387,8 @@ NTSTATUS LklUmount(IN PDEVICE_OBJECT dev,IN PFILE_OBJECT file)
 	PLKLVCB vcb=NULL;
 	BOOLEAN notified = FALSE;
 	BOOLEAN vcb_acquired = FALSE;
-
+    INT rc;
+    
 	vcb=(PLKLVCB) dev->DeviceExtension;
 	if (vcb == NULL)
 	   return STATUS_INVALID_PARAMETER;
@@ -397,10 +405,16 @@ NTSTATUS LklUmount(IN PDEVICE_OBJECT dev,IN PFILE_OBJECT file)
 			VfsReportError("Volume is NOT LOCKED");
 			return(STATUS_ACCESS_DENIED);
 		}
-
-	//unmount volume  ( linux way )
-	unload_linux_kernel();
-	SET_FLAG(vcb->flags, VFS_VCB_FLAGS_BEING_DISMOUNTED);
+  
+    DbgPrint("Unmounting device %s", vcb->linux_device.mnt);
+    rc = sys_unmount_wrapper(&vcb->linux_device); 
+  
+    if(rc<0) {
+            DbgPrint("Unmount failed with error code: %d", rc);
+            status = -rc; 
+    }        
+    if(NT_SUCCESS(status))
+            SET_FLAG(vcb->flags, VFS_VCB_FLAGS_BEING_DISMOUNTED);
 	if (vcb_acquired)
 			RELEASE(&vcb->vcb_resource);
 	if (!NT_SUCCESS(status) && notified)

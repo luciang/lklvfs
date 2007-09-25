@@ -40,7 +40,7 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 	Length = stack_location->Parameters.QueryVolume.Length;
 	SystemBuffer = irp->AssociatedIrp.SystemBuffer;
 	RtlZeroMemory(SystemBuffer, Length);
-	rc = sys_statfs_wrapper(vcb->volume_path, &mystat);
+	rc = sys_statfs_wrapper(vcb->linux_device.mnt, &mystat);
 	switch (FsInformationClass)
     {
 		case FileFsVolumeInformation:
@@ -235,7 +235,8 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
 	file_info = stack_location->Parameters.QueryFile.FileInformationClass;
 	length = stack_location->Parameters.QueryFile.Length;
 	buffer = irp->AssociatedIrp.SystemBuffer;
-	name = VfsCopyUnicodeStringToZcharUnixPath(&fcb->name);
+	name = VfsCopyUnicodeStringToZcharUnixPath(vcb->linux_device.mnt, 
+         vcb->linux_device.mnt_length, &fcb->name,NULL, 0);
 	DbgPrint("Query information on file: %s", name);
 	rc = sys_newfstat_wrapper(ccb->fd, &mystat);
     ExFreePool(name);

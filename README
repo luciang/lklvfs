@@ -1,4 +1,3 @@
 Linux Filesystem driver for WINDOWS
 
-There are some functions that seems to be missing from libntosknl.a; they are present in ntifs.h but commented out in ntoskrnl.def.
-In the worst case ( that means the presence of some annoying linker errors and no idea to solve them ) get the ntoskrnl.def from the w32api sources, uncomment the missing functions, then regenerate libntoskrnl.a in order to use it.
+

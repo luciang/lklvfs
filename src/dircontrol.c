@@ -88,7 +88,7 @@ struct dirent_buffer {
 #define FillId \
 	info->FileId.QuadPart = mystat.st_ino;
 
-NTSTATUS filldir(struct dirent_buffer * buf, IN PCHAR name, int namlen, ULONG offset, PUNICODE_STRING uname)
+NTSTATUS filldir(struct dirent_buffer * buf, IN PCHAR name, int namlen, ULONG offset, PLKLFCB fcb)
 {
     UNICODE_STRING file_name;
     STATS mystat;
@@ -114,17 +114,19 @@ NTSTATUS filldir(struct dirent_buffer * buf, IN PCHAR name, int namlen, ULONG of
 		return STATUS_INVALID_PARAMETER;
 	}
     
-	//DbgPrint("filldir(name='%.255s', namelen=%d, offset=%d)\n",
-	//	name, namlen, (int)offset);
 	file_name.Length = file_name.MaximumLength = namlen * 2;
 	file_name.Buffer = ExAllocatePoolWithTag(NonPagedPool, namlen*2, 'LTCD');
 	CharToWchar(file_name.Buffer, (char*)name, namlen);
     // make the full path for stat
-    path = CopyAppendUStringToZcharUnixPath(uname, name, namlen);
+    path = VfsCopyUnicodeStringToZcharUnixPath(fcb->vcb->linux_device.mnt, fcb->vcb->linux_device.mnt_length,
+           &fcb->name, name, namlen);
+           
     if(!path) {
         buf->status = STATUS_INSUFFICIENT_RESOURCES;
         return STATUS_INSUFFICIENT_RESOURCES;
     }
+    DbgPrint("filldir(path='%.255s', offset=%d)\n",
+		path,(int)offset);
     ret = sys_newstat_wrapper(path, &mystat);
     ExFreePool(path);
  
@@ -214,9 +216,9 @@ NTSTATUS VfsQueryDirectory(PIRPCONTEXT irp_context, PIRP irp,PIO_STACK_LOCATION 
     PSTR name_string;
     
     CHECK_OUT(fcb->id.type == VCB, STATUS_INVALID_PARAMETER);
-    name_string = VfsCopyUnicodeStringToZcharUnixPath(&fcb->name);
-    DbgPrint("Query directory %s", name_string);
-    ExFreePool(name_string);
+//    name_string = VfsCopyUnicodeStringToZcharUnixPath(vcb->linux_device.mnt, vcb->linux_device.mnt_length, &fcb->name);
+ //   DbgPrint("Query directory %s", name_string);
+  //  ExFreePool(name_string);
 	CHECK_OUT(!FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY), STATUS_INVALID_PARAMETER);
    
 	// If the caller cannot block, post the request to be handled asynchronously
@@ -316,7 +318,7 @@ NTSTATUS VfsQueryDirectory(PIRPCONTEXT irp_context, PIRP irp,PIO_STACK_LOCATION 
      de = (PDIRENT)((char*)lin_buffer+starting_index_for_search);
      while(starting_index_for_search < rc) {
           reclen=de->d_reclen;
-	      status = filldir(&win_buffer, de->d_name, reclen, starting_index_for_search, &fcb->name);
+	      status = filldir(&win_buffer, de->d_name, reclen, starting_index_for_search, fcb);
 	      if(!NT_SUCCESS(status))
                break;
 

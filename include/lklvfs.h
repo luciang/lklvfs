@@ -22,6 +22,7 @@
 #define	IOCTL_PREPARE_TO_UNLOAD \
 		CTL_CODE(FILE_DEVICE_UNKNOWN, 2048, METHOD_NEITHER, FILE_WRITE_ACCESS)
 
+
 // used for identifier
 #define	CCB				(0xfdecba02)
 #define	FCB				(0xfdecba03)
@@ -66,12 +67,10 @@ typedef struct lkl_fsd {
 	PDRIVER_OBJECT			driver;
 	PDEVICE_OBJECT			device;		// fs device
 	ULONG				    flags;		// flags- one is used for unload
+	ULONG                   no_mounts;  // how many times we had a mount, used to make the volume_path
 	LIST_ENTRY			    vcb_list;	// head of mounted volume list
-
 	FAST_IO_DISPATCH		fast_io_dispatch;
 	CACHE_MANAGER_CALLBACKS	cache_mgr_callbacks; // cache manager callbacks
-// temporary use:
-	PDEVICE_OBJECT		    mounted_volume; // current mounted device
 	HANDLE				    linux_thread;
 
 } LKLFSD;
@@ -103,10 +102,11 @@ typedef struct lkl_vcb
 	ULONG				        flags;
 	PDEVICE_OBJECT			    vcb_device;				// the volume device object
 	PDEVICE_OBJECT			    target_device;			// the physical device object
-	UCHAR				        *volume_path;			// volume path
+	PSTR				        volume_path;			// volume path
 	DISK_GEOMETRY			    disk_geometry;			// info about the disk
 	PARTITION_INFORMATION		partition_information;
-	//more fields here
+	LINDEV                      linux_device;
+    //more fields here
 
 } LKLVCB, * PLKLVCB;
 
@@ -235,14 +235,17 @@ NTSTATUS 	BlockDeviceIoControl(IN PDEVICE_OBJECT DeviceObject, IN ULONG	IoctlCod
 								   IN OUT PVOID OutputBuffer, IN OUT PULONG OutputBufferSize);
 NTSTATUS LockUserBuffer(IN PIRP Irp, IN ULONG Length, IN LOCK_OPERATION Operation);
 PVOID 	 GetUserBuffer(IN PIRP Irp);
-PSTR	 VfsCopyUnicodeStringToZcharUnixPath(PUNICODE_STRING src);
+PSTR     VfsCopyUnicodeStringToZcharUnixPath(PSTR root_path, USHORT root_path_len,
+                                             PUNICODE_STRING src, PSTR rel_name, USHORT name_length);
 PSTR     CopyAppendUStringToZcharUnixPath(PUNICODE_STRING src, PSTR rel_name, USHORT name_length);
+PSTR     CopyStringAppendULong(PSTR src, USHORT src_length, ULONG number);
 void     VfsCopyUnicodeString(PUNICODE_STRING dest, PUNICODE_STRING src);
 
 /* linux_init.c */
 
 NTSTATUS run_linux_kernel();
 void 	 unload_linux_kernel();
+int      linux_mount_disk(void *wdev, const char *name, const char *fs, PLINDEV lin_dev);
 
 /* workqueue.c */
 NTSTATUS LklPostRequest(PIRPCONTEXT irp_context, PIRP irp);

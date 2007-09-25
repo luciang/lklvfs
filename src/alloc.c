@@ -45,13 +45,15 @@ VOID CreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 
 VOID FreeVcb(PLKLVCB vcb)
 {
+     LONG rc;
+     
      if(vcb == NULL)
             return;
      if(vcb->id.type != VCB || vcb->id.size !=sizeof(LKLVCB))
             return;
      if(!FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VCB_INITIALIZED))
             return;
-            
+   
 	ClearVpbFlag(vcb->vpb, VPB_MOUNTED);
 
 	ExAcquireResourceExclusiveLite(&lklfsd.global_resource, TRUE);
