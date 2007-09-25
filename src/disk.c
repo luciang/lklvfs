@@ -1,7 +1,7 @@
 #include <lklvfs.h>
 #include <asm/callbacks.h>
 
-#include <drivers/file_disk.h>
+#include <drivers/disk.h>
 
 #define UNICODE_STRING_INIT(name, x) UNICODE_STRING name = { \
 	.Buffer = L##x, \

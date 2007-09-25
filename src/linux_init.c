@@ -4,7 +4,7 @@
 #include <asm/callbacks.h>
 #include <asm/unistd.h>
 #undef FASTCALL
-#include <drivers/file_disk.h>
+#include <drivers/disk.h>
 
 struct _thread_info {
         HANDLE th;

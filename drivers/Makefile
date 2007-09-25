@@ -1,3 +1,3 @@
 
-obj-y += console.o file_disk.o
+obj-y += console.o disk.o
 

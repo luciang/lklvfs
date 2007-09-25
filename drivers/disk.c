@@ -6,7 +6,7 @@
 #include <linux/interrupt.h>
 #include <asm/irq_regs.h>
 
-#include "file_disk.h"
+#include "disk.h"
 
 /*
  * The internal representation of our device.

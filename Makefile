@@ -35,7 +35,7 @@ lkl/.config: $(LKL_SOURCE)
 	-mkdir `dirname $@`
 	cp $^/arch/lkl/defconfig $@
 
-lkl/vmlinux: lkl/.config $(call SRCS,drivers)
+lkl/vmlinux: lkl/.config $(call SRCS,drivers) drivers/Makefile Makefile
 	cd $(LKL_SOURCE) && \
 	$(MAKE) O=$(HERE)/lkl ARCH=lkl CROSS_COMPILE=i586-mingw32msvc- \
 		LKL_DRIVERS=$(HERE)/drivers/ \
@@ -58,6 +58,7 @@ clean:
 	rm -f lklvfs.sys include/asm include/asm-i386 \
 	include/asm-generic include/linux $(call OBJS,src) lib/*.a
 	rm -rf .deps lkl
+	rm -f drivers/*.o drivers/.*.o.cmd drivers/built-in.o 
 
 TAGS: $(call SRCS,src) $(call SRCS,drivers) Makefile
 	cd $(LKL_SOURCE) && \
@@ -65,7 +66,6 @@ TAGS: $(call SRCS,src) $(call SRCS,drivers) Makefile
 	etags -f TAGS.tmp $^ 
 	cat lkl/TAGS TAGS.tmp > TAGS
 	rm TAGS.tmp
-
 
 .deps/%.d: %.c
 	mkdir -p .deps/$(dir $<)
