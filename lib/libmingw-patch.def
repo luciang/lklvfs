@@ -24,3 +24,6 @@ IoReleaseVpbSpinLock@4
 RtlTimeToSecondsSince1970@8
 @ExInterlockedPopEntrySList@8
 @ExInterlockedPushEntrySList@12
+FsRtlNotifyInitializeSync@4
+FsRtlNotifyUninitializeSync@4
+FsRtlNotifyFullChangeDirectory@40
