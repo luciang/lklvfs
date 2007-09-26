@@ -140,7 +140,7 @@ try_exit:
 	}
 	if (freeVcb) {
 		FreeVcb(vcb);
-		lklfsd.mounted_volume = NULL;
+
     }
 	return status;
 }

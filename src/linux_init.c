@@ -1,4 +1,4 @@
-#include <ddk/ntddk.h>
+#include <lklvfs.h>
 #undef FASTCALL
 #include <linux/stat.h>
 #include <asm/callbacks.h>
@@ -110,14 +110,17 @@ static KEVENT wait_for_me;
 static KEVENT good_to_go;
 
 
-int linux_mount_disk(void *wdev, const char *name, const char *fs)
+int linux_mount_disk(void *wdev, const char *name, const char *fs, PLINDEV lin_dev)
 {
 	void *ldisk;
 	dev_t devno;
 	char devno_str[]= { "/dev/xxxxxxxxxxxxxxxx" };
 	char *mnt;
+	
+	if(!lin_dev)
+        return STATUS_INVALID_PARAMETER;
 
-	if (lkl_disk_add_disk(wdev, name, 0, &devno, &ldisk)) 
+	if (lkl_disk_add_disk(wdev, name, lklfsd.no_mounts, &devno, &ldisk)) 
 		goto out_error;
 
 	/* create /dev/dev */
@@ -126,7 +129,7 @@ int linux_mount_disk(void *wdev, const char *name, const char *fs)
 		goto out_del_disk;
 
 	/* create /mnt/filename */ 
-	mnt=ExAllocatePool(PagedPool, strlen("/mnt/")+strlen(name)+1);
+	mnt=ExAllocatePool(NonPagedPool, strlen("/mnt/")+strlen(name)+1);
 	if (!mnt)
 		goto out_del_dev;
 
@@ -135,9 +138,15 @@ int linux_mount_disk(void *wdev, const char *name, const char *fs)
 		goto out_free_mnt;
 
 	/* mount and chdir */
+	DbgPrint("Mounting %s in %s", devno_str, mnt);
 	if (sys_safe_mount(devno_str, mnt, (char*)fs, 0, 0))
 		goto out_del_mnt_dir;
-	
+
+	lin_dev->ldisk = ldisk;
+	lin_dev->mnt_length = strlen(mnt);
+	lin_dev->devno_str_length = sizeof(devno_str);
+	RtlCopyMemory(lin_dev->mnt,mnt, lin_dev->mnt_length); 
+	RtlCopyMemory(lin_dev->devno_str, devno_str, lin_dev->devno_str_length);
 	ExFreePool(mnt);
 
 	return STATUS_SUCCESS;
@@ -151,7 +160,7 @@ out_del_dev:
 out_del_disk:
 	lkl_disk_del_disk(ldisk);
 out_error:
-	DbgPrint("can't mount disk %name\n", name);
+	DbgPrint("can't mount disk %s\n", name);
 	return STATUS_INVALID_DEVICE_REQUEST;
 }
 

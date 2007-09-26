@@ -62,21 +62,40 @@ VOID CharToWchar(PWCHAR Destination, PCHAR Source, ULONG Length)
 	}
 }
 
-PSTR VfsCopyUnicodeStringToZcharUnixPath(PUNICODE_STRING src)
+PSTR VfsCopyUnicodeStringToZcharUnixPath(PSTR root_path, USHORT root_path_len,
+      PUNICODE_STRING src, PSTR rel_name, USHORT name_length)
 {
 	int i, length;
 	PSTR dest;
-
+    
+    if(rel_name == NULL )
+        name_length = 0;
+        
 	length = src->Length / sizeof(WCHAR);
-	dest = ExAllocatePoolWithTag(NonPagedPool, length + 1, 'RHCU');
+	dest = ExAllocatePoolWithTag(NonPagedPool, root_path_len + length + name_length + 1, 'RHCU');
 	if (!dest)
 		return NULL;
+		
+	for(i = 0; i < root_path_len; i++) {
+          dest[i] = (char) root_path[i];
+    }
+    
 	for (i = 0; i < length; i++) {
-		dest[i] = (char)src->Buffer[i];
-		if (dest[i] == '\\') dest[i] = '/';
+		dest[root_path_len + i] = (char)src->Buffer[i];
+		if (dest[root_path_len + i] == '\\') dest[root_path_len + i] = '/';
 	}
-	dest[length] = 0;
-
+	
+	root_path_len = root_path_len + length;
+	
+	if(dest[root_path_len-1] != '/') {
+	  dest[root_path_len] = '/';
+	  root_path_len++;
+   }
+    for(i = 0; i < name_length; i++) {
+          dest[root_path_len+i] = (char) rel_name[i];
+    }
+    dest[root_path_len + name_length] = 0;
+    
 	return dest;
 }
 
@@ -101,6 +120,28 @@ PSTR CopyAppendUStringToZcharUnixPath(PUNICODE_STRING src, PSTR rel_name, USHORT
           dest[length+i] = (char) rel_name[i];
     }
     dest[length+name_length] = 0;
+    
+    return dest;
+}
+
+// for device name
+PSTR CopyStringAppendULong(PSTR src, USHORT src_length, ULONG number)
+{
+    PSTR dest;
+    int i, letter;
+    dest = ExAllocatePoolWithTag(NonPagedPool, 255,'RAHC');
+    if(!dest)
+        return NULL;
+    RtlZeroMemory(dest, 255);
+    
+	for(i = 0; i < src_length; i++) {
+      dest[i] = (char) src[i];
+      }
+    while(number>0) {
+         letter = number % 10;
+         dest[i++] = (char) ('0' + letter);
+         number = number /10;
+    }
     
     return dest;
 }

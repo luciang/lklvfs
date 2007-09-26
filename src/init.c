@@ -31,7 +31,6 @@ NTSTATUS DDKAPI DriverEntry(IN PDRIVER_OBJECT driver,IN PUNICODE_STRING reg_path
 
 		// fs driver object
 		lklfsd.driver = driver;
-		lklfsd.mounted_volume = NULL;
 		status = ExInitializeResourceLite(&(lklfsd.global_resource));
 		CHECK_OUT(!NT_SUCCESS(status), status);
 		resource_init = TRUE;
@@ -100,14 +99,14 @@ try_exit:
     if(NT_SUCCESS(status)) {
     	IoRegisterFileSystem(lklfsd.device);
     	DbgPrint("LklVFS loaded succesfully");
-}
+    }
 	return status;
 }
 
 VOID InitializeFunctionPointers(PDRIVER_OBJECT driver)
 {
 	driver->DriverUnload = DriverUnload;
-	// TODO -functions that MUST be supported
+	// functions that MUST be supported
 	driver->MajorFunction[IRP_MJ_DEVICE_CONTROL] = VfsDeviceControl;
 	driver->MajorFunction[IRP_MJ_FILE_SYSTEM_CONTROL] = VfsFileSystemControl;
 	driver->MajorFunction[IRP_MJ_QUERY_VOLUME_INFORMATION] = VfsQueryVolumeInformation;
@@ -157,7 +156,8 @@ VOID DDKAPI DriverUnload(PDRIVER_OBJECT driver)
 	UNICODE_STRING dos_name;
 
 	DbgPrint("Unloading LklVfs");
-
+	
+    unload_linux_kernel();
     FreeSysWrapperResources();
 	RtlInitUnicodeString(&dos_name, LKL_DOS_DEVICE);
 	IoDeleteSymbolicLink(&dos_name);

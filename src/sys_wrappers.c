@@ -4,7 +4,6 @@
 
 #include <sys_wrappers.h>
 
-
 NTSTATUS InitializeSysWrappers()
 {
          // do whatever kind of initialization here
@@ -88,4 +87,22 @@ LONG sys_getdents_wrapper(UINT fd, OUT PDIRENT dirent, UINT count)
      rc = sys_getdents(fd, dirent, count);
      
      return rc;
+}
+
+LONG sys_unmount_wrapper(PLINDEV ldev)
+{
+     LONG rc = 0;
+     
+     if(!ldev)
+         return -1;
+     sys_sync();
+     rc = sys_umount(ldev->mnt, 0x00000001);
+     if(rc <0)
+           return rc;
+
+    sys_unlink(ldev->mnt);
+	sys_unlink(ldev->devno_str);
+	lkl_disk_del_disk(ldev->ldisk);
+	
+	return rc;
 }

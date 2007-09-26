@@ -217,9 +217,10 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	}
 	// open file
 	if (requestedDisposition == FILE_OPEN) {
-		unixPath =  VfsCopyUnicodeStringToZcharUnixPath(&absolutePathName);
- 	    DbgPrint("Open file %s", unixPath);
+		unixPath =  VfsCopyUnicodeStringToZcharUnixPath(vcb->linux_device.mnt, 
+                    vcb->linux_device.mnt_length, &absolutePathName, NULL, 0);
 		CHECK_OUT(unixPath == NULL, STATUS_INSUFFICIENT_RESOURCES);
+		DbgPrint("Open file %s", unixPath);
 		
 		if (directoryOnlyRequested)
 		   fd = sys_open_wrapper(unixPath, O_RDONLY|O_DIRECTORY|O_LARGEFILE, 0666);
@@ -231,7 +232,8 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	else
 	{
 		// create and ... ?
-		unixPath =  VfsCopyUnicodeStringToZcharUnixPath(&absolutePathName);
+		unixPath =  VfsCopyUnicodeStringToZcharUnixPath(vcb->linux_device.mnt, 
+                    vcb->linux_device.mnt_length, &absolutePathName, NULL, 0);
 		CHECK_OUT(unixPath == NULL, STATUS_INSUFFICIENT_RESOURCES);
 		DbgPrint("Create/overwrite file %s", unixPath);
 	    ExFreePool(unixPath);
@@ -360,7 +362,7 @@ NTSTATUS OpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
     
 	root_ino = 0; 
     //open root directory
-    fd = sys_open_wrapper("/", O_RDONLY|O_LARGEFILE|O_DIRECTORY, 0);
+    fd = sys_open_wrapper(vcb->linux_device.mnt, O_RDONLY|O_LARGEFILE|O_DIRECTORY, 0);
     CHECK_OUT(fd < 0, STATUS_OBJECT_PATH_NOT_FOUND);
     // stat to get some info about inode
     sys_newfstat_wrapper(fd, &mystat);
