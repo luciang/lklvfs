@@ -131,7 +131,7 @@ try_exit:
 	if (vcbResourceAquired)
 		RELEASE(&vcb->vcb_resource);
 	if (postRequest) {
-		DbgPrint("post request");
+		DbgPrint("post close request");
 		status = LklPostRequest(irp_context, irp);
 	}
 	else if (completeIrp && status != STATUS_PENDING) {

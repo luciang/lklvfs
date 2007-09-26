@@ -72,10 +72,11 @@ PSTR VfsCopyUnicodeStringToZcharUnixPath(PSTR root_path, USHORT root_path_len,
         name_length = 0;
         
 	length = src->Length / sizeof(WCHAR);
-	dest = ExAllocatePoolWithTag(NonPagedPool, root_path_len + length + name_length + 1, 'RHCU');
+	dest = ExAllocatePoolWithTag(NonPagedPool, 255, 'RHCU');
 	if (!dest)
 		return NULL;
 		
+	RtlZeroMemory(dest, 255);
 	for(i = 0; i < root_path_len; i++) {
           dest[i] = (char) root_path[i];
     }

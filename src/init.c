@@ -154,10 +154,7 @@ VOID InitializeFastIO(PDRIVER_OBJECT driver)
 VOID DDKAPI DriverUnload(PDRIVER_OBJECT driver)
 {
 	UNICODE_STRING dos_name;
-
-	DbgPrint("Unloading LklVfs");
 	
-    unload_linux_kernel();
     FreeSysWrapperResources();
 	RtlInitUnicodeString(&dos_name, LKL_DOS_DEVICE);
 	IoDeleteSymbolicLink(&dos_name);

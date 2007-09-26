@@ -86,10 +86,13 @@ NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp)
 
 	CHECK_OUT(FLAG_ON(lklfsd.flags, VFS_UNLOAD_PENDING), STATUS_ACCESS_DENIED);
 	CHECK_OUT(!IsListEmpty(&lklfsd.vcb_list), STATUS_ACCESS_DENIED);
-
+    DbgPrint("Unloading LklVfs");
 	IoUnregisterFileSystem(lklfsd.device);
+	
+    unload_linux_kernel();
+    
 	IoDeleteDevice(lklfsd.device);
-
+     
 	SET_FLAG(lklfsd.flags, VFS_UNLOAD_PENDING);
 try_exit:
 

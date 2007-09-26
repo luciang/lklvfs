@@ -93,6 +93,7 @@ int linux_new_thread(int (*fn)(void*), void *arg, void *pti)
 
 long linux_panic_blink(long time)
 {
+    DbgPrint("***Kernel panic!***");
 	while (1);
         return 0;
 }
@@ -137,7 +138,7 @@ int linux_mount_disk(void *wdev, const char *name, const char *fs, PLINDEV lin_d
 	if (sys_mkdir(mnt, 0700))
 		goto out_free_mnt;
 
-	/* mount and chdir */
+	/* mount */
 	DbgPrint("Mounting %s in %s", devno_str, mnt);
 	if (sys_safe_mount(devno_str, mnt, (char*)fs, 0, 0))
 		goto out_del_mnt_dir;
@@ -231,6 +232,7 @@ void linux_timer(unsigned long delta)
 void linux_halt(void)
 {
 	ExFreePool(_phys_mem);
+   
 }
 
 
@@ -281,7 +283,7 @@ NTSTATUS run_linux_kernel(void)
     KeInitializeEvent(&debug_thread_event, NotificationEvent, FALSE);
     KeInitializeEvent(&wait_for_me, NotificationEvent, FALSE);
     KeInitializeEvent(&good_to_go, NotificationEvent, FALSE);
-    
+     
 	status = PsCreateSystemThread(&lith, THREAD_ALL_ACCESS, NULL, NULL, NULL,
 			     linux_idle_thread, NULL);
     KeWaitForSingleObject(&good_to_go, Executive, KernelMode, FALSE, NULL);

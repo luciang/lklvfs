@@ -2,11 +2,12 @@
 * file system control operations
 * TODOs:
 * FIXME: for now we allow only ext3 to be mounted: keep a list, and try a mount for each fs from the list
-* FIXME (BUG) when I try to mount the fs the second time, it gets me a BSOD
-* FIXME (BUG) when I open a file, and then unmount the volume it crashes -> see CcCacheFlush( )
+* FIXME (BUG) sys_umount returns EBUSY every time
+* FIXME (BUG) when I open a file, and then unmount the volume it crashes
 **/
 
 #include <lklvfs.h>
+
 //
 //	IRP_MJ_FILE_SYSTEM_CONTROL
 //
@@ -36,6 +37,9 @@ NTSTATUS DDKAPI VfsFileSystemControl(PDEVICE_OBJECT device, PIRP irp)
 		LklCompleteRequest(irp, status);
 		break;
 	case IRP_MN_LOAD_FILE_SYSTEM:
+	case IRP_MN_KERNEL_CALL:
+	    LklCompleteRequest(irp, STATUS_NOT_IMPLEMENTED);
+		break;
 	default:
 		LklCompleteRequest(irp, STATUS_INVALID_DEVICE_REQUEST);
 		break;
@@ -317,7 +321,7 @@ VOID DDKAPI VfsPurgeVolume(PLKLVCB vcb, BOOLEAN flush_before_purge)
 		}
 		ExFreePool(fcb_list_entry);
 	}
-
+    sys_sync_wrapper();
 	VfsReportError("Volume flushed and purged");
 
 	if (vcb_acquired)
@@ -407,18 +411,20 @@ NTSTATUS LklUmount(IN PDEVICE_OBJECT dev,IN PFILE_OBJECT file)
 		}
   
     DbgPrint("Unmounting device %s", vcb->linux_device.mnt);
-    rc = sys_unmount_wrapper(&vcb->linux_device); 
+    
+  /*  rc = sys_unmount_wrapper(&vcb->linux_device); 
   
     if(rc<0) {
             DbgPrint("Unmount failed with error code: %d", rc);
-            status = -rc; 
-    }        
+           	status = STATUS_ACCESS_DENIED; 
+    }    */
+    
     if(NT_SUCCESS(status))
             SET_FLAG(vcb->flags, VFS_VCB_FLAGS_BEING_DISMOUNTED);
-	if (vcb_acquired)
-			RELEASE(&vcb->vcb_resource);
-	if (!NT_SUCCESS(status) && notified)
-		FsRtlNotifyVolumeEvent(file, FSRTL_VOLUME_DISMOUNT_FAILED);
+    if (vcb_acquired)
+    		RELEASE(&vcb->vcb_resource);
+    if (!NT_SUCCESS(status) && notified)
+    	FsRtlNotifyVolumeEvent(file, FSRTL_VOLUME_DISMOUNT_FAILED);
 	return status;
 }
 

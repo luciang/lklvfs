@@ -3,6 +3,7 @@
 **/
 
 #include <sys_wrappers.h>
+#include <linux/fs.h>
 
 NTSTATUS InitializeSysWrappers()
 {
@@ -95,8 +96,8 @@ LONG sys_unmount_wrapper(PLINDEV ldev)
      
      if(!ldev)
          return -1;
-     sys_sync();
-     rc = sys_umount(ldev->mnt, 0x00000001);
+
+     rc = sys_umount(ldev->mnt, 0x00000002);
      if(rc <0)
            return rc;
 
@@ -105,4 +106,9 @@ LONG sys_unmount_wrapper(PLINDEV ldev)
 	lkl_disk_del_disk(ldev->ldisk);
 	
 	return rc;
+}
+
+void sys_sync_wrapper()
+{
+     sys_sync();
 }
