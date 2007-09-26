@@ -109,6 +109,10 @@ void linux_mem_init(unsigned long *phys_mem, unsigned long *phys_mem_size)
 static KEVENT wait_for_me;
 static KEVENT good_to_go;
 
+extern int snprintf(char * buf, size_t size, const char * fmt, ...)
+	__attribute__ ((format (printf, 3, 4)));
+extern int sprintf(char * buf, const char * fmt, ...)
+	__attribute__ ((format (printf, 2, 3)));
 
 int linux_mount_disk(void *wdev, const char *name, const char *fs, PLINDEV lin_dev)
 {

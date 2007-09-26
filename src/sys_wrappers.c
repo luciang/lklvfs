@@ -1,7 +1,8 @@
 /**
 * implement this at your will
 **/
-
+#include <linux/types.h>
+#include <drivers/disk.h>
 #include <sys_wrappers.h>
 
 NTSTATUS InitializeSysWrappers()

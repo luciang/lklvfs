@@ -33,5 +33,6 @@ LONG sys_newfstat_wrapper(UINT fd,OUT PSTATS);
 LONG sys_newstat_wrapper(IN PSTR filename,OUT PSTATS statbuf);
 LONG sys_statfs_wrapper(IN PCSTR path,OUT PSTATFS);
 LONG sys_getdents_wrapper(UINT fd, OUT PDIRENT, UINT count);
+LONG sys_unmount_wrapper(PLINDEV ldev);
 
 #endif
