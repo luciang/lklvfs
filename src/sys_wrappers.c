@@ -18,7 +18,7 @@ void FreeSysWrapperResources()
 
 }
 
-LONG sys_open_wrapper(PSTR pathName, INT flags, INT mode)
+LONG sys_open_wrapper(PCSTR pathName, INT flags, INT mode)
 {
      LONG rc;
      
@@ -72,7 +72,7 @@ LONG sys_newstat_wrapper(IN PSTR filename,OUT PSTATS statbuf)
      return rc;
 }
 
-LONG sys_statfs_wrapper(PSTR path, OUT PSTATFS statfs_buff)
+LONG sys_statfs_wrapper(PCSTR path, OUT PSTATFS statfs_buff)
 {
      LONG rc;
      

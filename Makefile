@@ -41,7 +41,7 @@ lkl/vmlinux: lkl/.config $(call SRCS,drivers) drivers/Makefile Makefile
 		LKL_DRIVERS=$(HERE)/drivers/ \
 		vmlinux
 
-CFLAGS=-Iinclude -D_WIN32_WINNT=0x0500 -Wno-multichar
+CFLAGS=-Iinclude -D_WIN32_WINNT=0x0500 -Wall -Wno-multichar
 
 lib/%.a: lib/%.def
 	$(DLLTOOL) --as=$(AS) -k --output-lib $@ --def $^
@@ -60,7 +60,7 @@ clean:
 	rm -rf .deps lkl
 	rm -f drivers/*.o drivers/.*.o.cmd drivers/built-in.o 
 
-TAGS: $(call SRCS,src) $(call SRCS,drivers) Makefile
+TAGS: $(call SRCS,src) $(call SRCS,drivers) Makefile include/*.h
 	cd $(LKL_SOURCE) && \
 	$(MAKE) O=$(HERE)/lkl ARCH=lkl CROSS_COMPILE=i586-mingw32msvc- TAGS 
 	etags -f TAGS.tmp $^ 
