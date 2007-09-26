@@ -245,7 +245,6 @@ void     VfsCopyUnicodeString(PUNICODE_STRING dest, PUNICODE_STRING src);
 
 NTSTATUS run_linux_kernel();
 void 	 unload_linux_kernel();
-int      linux_mount_disk(void *wdev, const char *name, const char *fs, PLINDEV lin_dev);
 
 /* workqueue.c */
 NTSTATUS LklPostRequest(PIRPCONTEXT irp_context, PIRP irp);

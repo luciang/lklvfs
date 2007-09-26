@@ -114,60 +114,6 @@ extern int snprintf(char * buf, size_t size, const char * fmt, ...)
 extern int sprintf(char * buf, const char * fmt, ...)
 	__attribute__ ((format (printf, 2, 3)));
 
-int linux_mount_disk(void *wdev, const char *name, const char *fs, PLINDEV lin_dev)
-{
-	void *ldisk;
-	dev_t devno;
-	char devno_str[]= { "/dev/xxxxxxxxxxxxxxxx" };
-	char *mnt;
-	
-	if(!lin_dev)
-        return STATUS_INVALID_PARAMETER;
-
-	if (lkl_disk_add_disk(wdev, name, lklfsd.no_mounts, &devno, &ldisk)) 
-		goto out_error;
-
-	/* create /dev/dev */
-	snprintf(devno_str, sizeof(devno_str), "/dev/%016x", devno);
-	if (sys_mknod(devno_str, S_IFBLK|0600, devno)) 
-		goto out_del_disk;
-
-	/* create /mnt/filename */ 
-	mnt=ExAllocatePool(NonPagedPool, strlen("/mnt/")+strlen(name)+1);
-	if (!mnt)
-		goto out_del_dev;
-
-	sprintf(mnt, "/mnt/%s", name);
-	if (sys_mkdir(mnt, 0700))
-		goto out_free_mnt;
-
-	/* mount and chdir */
-	DbgPrint("Mounting %s in %s", devno_str, mnt);
-	if (sys_safe_mount(devno_str, mnt, (char*)fs, 0, 0))
-		goto out_del_mnt_dir;
-
-	lin_dev->ldisk = ldisk;
-	lin_dev->mnt_length = strlen(mnt);
-	lin_dev->devno_str_length = sizeof(devno_str);
-	RtlCopyMemory(lin_dev->mnt,mnt, lin_dev->mnt_length); 
-	RtlCopyMemory(lin_dev->devno_str, devno_str, lin_dev->devno_str_length);
-	ExFreePool(mnt);
-
-	return STATUS_SUCCESS;
-
-out_del_mnt_dir:
-	sys_unlink(mnt);
-out_free_mnt:
-	ExFreePool(mnt);
-out_del_dev:
-	sys_unlink(devno_str);
-out_del_disk:
-	lkl_disk_del_disk(ldisk);
-out_error:
-	DbgPrint("can't mount disk %s\n", name);
-	return STATUS_INVALID_DEVICE_REQUEST;
-}
-
 
 void linux_main(void)
 {
