@@ -1,8 +1,8 @@
 /**
 * file system control operations
 * TODOs:
-* FIXME: for now we allow only ext3 to be mounted: keep a list, and try a mount for each fs from the list
 * FIXME (BUG) sys_umount returns EBUSY every time
+* FIXME (BUG) when I open a file, and then unmount the volume it crashes
 * FIXME (BUG) when I open a file, and then unmount the volume it crashes
 **/
 
@@ -99,7 +99,7 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 	vcb = (PLKLVCB) volume_device->DeviceExtension;
 	dev_name = CopyStringAppendULong("device", 6, lklfsd.no_mounts);
 	DbgPrint("Mounting device '%s'", dev_name);
-	status=linux_mount_disk(vcb->target_device,dev_name , "ext3", &vcb->linux_device);
+	status=sys_mount_wrapper(vcb->target_device, dev_name, &vcb->linux_device);
     ExFreePool(dev_name);
    	RELEASE(&(lklfsd.global_resource));
 	CHECK_OUT(!NT_SUCCESS(status), status);
@@ -391,7 +391,7 @@ NTSTATUS LklUmount(IN PDEVICE_OBJECT dev,IN PFILE_OBJECT file)
 	PLKLVCB vcb=NULL;
 	BOOLEAN notified = FALSE;
 	BOOLEAN vcb_acquired = FALSE;
-    INT rc;
+  //  INT rc;
     
 	vcb=(PLKLVCB) dev->DeviceExtension;
 	if (vcb == NULL)

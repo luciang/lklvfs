@@ -3,7 +3,7 @@
 * TODO 
 **/
 #include <lklvfs.h>
-
+#include <linux/stat.h>
 
 NTSTATUS DDKAPI VfsDirectoryControl(PDEVICE_OBJECT device, PIRP irp)
 {
@@ -213,7 +213,6 @@ NTSTATUS VfsQueryDirectory(PIRPCONTEXT irp_context, PIRP irp,PIO_STACK_LOCATION 
     PDIRENT de;
     ULONG reclen;
     LONG rc;
-    PSTR name_string;
     
     CHECK_OUT(fcb->id.type == VCB, STATUS_INVALID_PARAMETER);
 //    name_string = VfsCopyUnicodeStringToZcharUnixPath(vcb->linux_device.mnt, vcb->linux_device.mnt_length, &fcb->name);

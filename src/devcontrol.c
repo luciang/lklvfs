@@ -6,6 +6,7 @@
 
 #include <lklvfs.h>
 
+
 NTSTATUS LklIoctlCompletion(PDEVICE_OBJECT device, PIRP irp, PVOID context);
 NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp);
 
