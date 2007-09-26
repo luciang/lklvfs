@@ -232,7 +232,7 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 		   fd = sys_open_wrapper(unixPath, O_RDONLY|O_DIRECTORY|O_LARGEFILE, 0666);
         else
            fd = sys_open_wrapper(unixPath, O_RDONLY|O_LARGEFILE, 0666);
-        ExFreePool(unixPath);
+        FreeUnixPathString(unixPath);
         CHECK_OUT((fd<=0), STATUS_OBJECT_PATH_NOT_FOUND);
 	}
 	else
@@ -242,7 +242,7 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
                     vcb->linux_device.mnt_length, &absolutePathName, NULL, 0);
 		CHECK_OUT(unixPath == NULL, STATUS_INSUFFICIENT_RESOURCES);
 		DbgPrint("Create/overwrite file %s", unixPath);
-	    ExFreePool(unixPath);
+	    FreeUnixPathString(unixPath);
 		TRY_RETURN(STATUS_NOT_IMPLEMENTED);
 	}
 	

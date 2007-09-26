@@ -10,6 +10,7 @@
 #define LKL_DEVICE		L"\\DosDevices\\F:"
 #define LKL_FS_NAME		L"\\lklvfs"
 #define LKL_DOS_DEVICE	L"\\DosDevices\\lklvfs"
+#define STR_MAX_LEN     255
 
 #define CHECK_OUT(cond, S)		{if(cond){status=S;goto try_exit;}}
 #define FLAG_ON(flag, val)		((BOOLEAN)((((flag)&(val))!=0)))
@@ -61,6 +62,7 @@ typedef struct irp_context {
 extern PNPAGED_LOOKASIDE_LIST ccb_cachep;
 extern PNPAGED_LOOKASIDE_LIST fcb_cachep;
 extern PNPAGED_LOOKASIDE_LIST irp_context_cachep;
+extern PNPAGED_LOOKASIDE_LIST name_cachep;
 
 typedef struct lkl_fsd {
 	ERESOURCE			    global_resource;
@@ -240,6 +242,7 @@ PSTR     VfsCopyUnicodeStringToZcharUnixPath(PSTR root_path, USHORT root_path_le
 PSTR     CopyAppendUStringToZcharUnixPath(PUNICODE_STRING src, PSTR rel_name, USHORT name_length);
 PSTR     CopyStringAppendULong(PSTR src, USHORT src_length, ULONG number);
 void     VfsCopyUnicodeString(PUNICODE_STRING dest, PUNICODE_STRING src);
+void     FreeUnixPathString(PSTR name);
 
 /* linux_init.c */
 

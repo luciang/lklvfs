@@ -3,7 +3,6 @@
 * TODOs:
 * FIXME (BUG) sys_umount returns EBUSY every time
 * FIXME (BUG) when I open a file, and then unmount the volume it crashes
-* FIXME (BUG) when I open a file, and then unmount the volume it crashes
 **/
 
 #include <lklvfs.h>
@@ -280,7 +279,7 @@ VOID DDKAPI VfsPurgeVolume(PLKLVCB vcb, BOOLEAN flush_before_purge)
 	PLIST_ENTRY entry = NULL;
 	PFCB_LIST_ENTRY fcb_list_entry;
 
-
+    DbgPrint("Try to purge the volume");
 	ASSERT(vcb);
 	// acquire vcb resource
 	ExAcquireResourceSharedLite(&vcb->vcb_resource, TRUE);
@@ -321,7 +320,7 @@ VOID DDKAPI VfsPurgeVolume(PLKLVCB vcb, BOOLEAN flush_before_purge)
 		}
 		ExFreePool(fcb_list_entry);
 	}
-    sys_sync_wrapper();
+   // sys_sync_wrapper();
 	VfsReportError("Volume flushed and purged");
 
 	if (vcb_acquired)

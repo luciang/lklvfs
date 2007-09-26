@@ -182,7 +182,7 @@ LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev)
 		goto out_free_mnt;
 
 	DbgPrint("Mounting %s in %s", devno_str, mnt);
-	if (try_mount(devno_str, mnt, 0, 0))
+	if (try_mount(devno_str, mnt, MS_RDONLY, 0))
 		goto out_del_mnt_dir;
 
 	lin_dev->ldisk = ldisk;

@@ -115,7 +115,7 @@ NTSTATUS filldir(struct dirent_buffer * buf, IN PCHAR name, int namlen, ULONG of
 	}
     
 	file_name.Length = file_name.MaximumLength = namlen * 2;
-	file_name.Buffer = ExAllocatePoolWithTag(NonPagedPool, namlen*2, 'LTCD');
+	file_name.Buffer = ExAllocateFromNPagedLookasideList(name_cachep);
 	CharToWchar(file_name.Buffer, (char*)name, namlen);
     // make the full path for stat
     path = VfsCopyUnicodeStringToZcharUnixPath(fcb->vcb->linux_device.mnt, fcb->vcb->linux_device.mnt_length,
@@ -128,7 +128,7 @@ NTSTATUS filldir(struct dirent_buffer * buf, IN PCHAR name, int namlen, ULONG of
     DbgPrint("filldir(path='%.255s', offset=%d)\n",
 		path,(int)offset);
     ret = sys_newstat_wrapper(path, &mystat);
-    ExFreePool(path);
+    FreeUnixPathString(path);
  
     if(ret<0) {
         buf->status = STATUS_DISK_CORRUPT_ERROR;
@@ -190,7 +190,7 @@ NTSTATUS filldir(struct dirent_buffer * buf, IN PCHAR name, int namlen, ULONG of
 		}
     }
     
-    RtlFreeUnicodeString(&file_name);
+    FreeUnixPathString(file_name.Buffer);
 	
 	buf->status = STATUS_SUCCESS;
 	return STATUS_SUCCESS;
@@ -215,9 +215,6 @@ NTSTATUS VfsQueryDirectory(PIRPCONTEXT irp_context, PIRP irp,PIO_STACK_LOCATION 
     LONG rc;
     
     CHECK_OUT(fcb->id.type == VCB, STATUS_INVALID_PARAMETER);
-//    name_string = VfsCopyUnicodeStringToZcharUnixPath(vcb->linux_device.mnt, vcb->linux_device.mnt_length, &fcb->name);
- //   DbgPrint("Query directory %s", name_string);
-  //  ExFreePool(name_string);
 	CHECK_OUT(!FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY), STATUS_INVALID_PARAMETER);
    
 	// If the caller cannot block, post the request to be handled asynchronously

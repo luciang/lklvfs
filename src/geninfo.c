@@ -240,7 +240,7 @@ NTSTATUS DDKAPI VfsQueryInformation(PDEVICE_OBJECT device ,PIRP irp)
          vcb->linux_device.mnt_length, &fcb->name,NULL, 0);
 	DbgPrint("Query information on file: %s", name);
 	rc = sys_newfstat_wrapper(ccb->fd, &mystat);
-    ExFreePool(name);
+    FreeUnixPathString(name);
     CHECK_OUT(rc<0, STATUS_INVALID_PARAMETER);
     
 	switch (file_info) {
