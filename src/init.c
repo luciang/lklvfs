@@ -11,6 +11,7 @@ LKLFSD lklfsd;
 PNPAGED_LOOKASIDE_LIST ccb_cachep;
 PNPAGED_LOOKASIDE_LIST fcb_cachep;
 PNPAGED_LOOKASIDE_LIST irp_context_cachep;
+PNPAGED_LOOKASIDE_LIST name_cachep;
 
 
 NTSTATUS DDKAPI DriverEntry(IN PDRIVER_OBJECT driver,IN PUNICODE_STRING reg_path)
@@ -54,6 +55,7 @@ NTSTATUS DDKAPI DriverEntry(IN PDRIVER_OBJECT driver,IN PUNICODE_STRING reg_path
 	lklfsd.cache_mgr_callbacks.AcquireForReadAhead = VfsAcqReadAhead;
 	lklfsd.cache_mgr_callbacks.ReleaseFromReadAhead = VfsRelReadAhead;			
 
+
 	//init asynch initialization -- no need for it because we use system worker threads
 	//init event used for async irp processing in our kernel thread(s) -- the same
 
@@ -64,9 +66,12 @@ NTSTATUS DDKAPI DriverEntry(IN PDRIVER_OBJECT driver,IN PUNICODE_STRING reg_path
 	ASSERT(fcb_cachep);
 	irp_context_cachep = ExAllocatePoolWithTag(NonPagedPool, sizeof(NPAGED_LOOKASIDE_LIST), 'priL');
 	ASSERT(irp_context_cachep);
+	name_cachep = ExAllocatePoolWithTag(NonPagedPool, sizeof(NPAGED_LOOKASIDE_LIST), 'htpL');
+	ASSERT(name_cachep);
 	ExInitializeNPagedLookasideList(ccb_cachep, NULL, NULL, 0, sizeof(LKLCCB),'bcC',0);
 	ExInitializeNPagedLookasideList(fcb_cachep, NULL, NULL, 0, sizeof(LKLFCB),'bcF',0);
 	ExInitializeNPagedLookasideList(irp_context_cachep, NULL, NULL, 0, sizeof(IRPCONTEXT),'cprI',0);
+	ExInitializeNPagedLookasideList(name_cachep, NULL, NULL, 0, STR_MAX_LEN,'HTPU',0);
 
 	// create visible link to the fs device for unloading
 	RtlInitUnicodeString(&dos_name, LKL_DOS_DEVICE);
@@ -152,18 +157,17 @@ VOID InitializeFastIO(PDRIVER_OBJECT driver)
 VOID DDKAPI DriverUnload(PDRIVER_OBJECT driver)
 {
 	UNICODE_STRING dos_name;
-
-	DbgPrint("Unloading LklVfs");
 	
-	unload_linux_kernel();
 	FreeSysWrapperResources();
 	RtlInitUnicodeString(&dos_name, LKL_DOS_DEVICE);
 	IoDeleteSymbolicLink(&dos_name);
 	ExDeleteNPagedLookasideList(ccb_cachep);
 	ExDeleteNPagedLookasideList(fcb_cachep);
 	ExDeleteNPagedLookasideList(irp_context_cachep);
+	ExDeleteNPagedLookasideList(name_cachep);
 	ExFreePool(ccb_cachep);
 	ExFreePool(fcb_cachep);
+	ExFreePool(name_cachep);
 	ExFreePool(irp_context_cachep);
 	ExDeleteResourceLite(&lklfsd.global_resource);
 

@@ -4,6 +4,7 @@
 #include <ddk/ntddk.h>
 #undef FASTCALL
 #include <asm/unistd.h>
+#include<asm-generic/statfs.h>
 #undef FASTCALL
 
 typedef struct stat           STATS;
@@ -35,5 +36,6 @@ LONG sys_statfs_wrapper(IN PCSTR path,OUT PSTATFS);
 LONG sys_getdents_wrapper(UINT fd, OUT PDIRENT, UINT count);
 LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev);
 LONG sys_unmount_wrapper(PLINDEV ldev);
+void sys_sync_wrapper();
 
 #endif

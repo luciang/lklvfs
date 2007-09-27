@@ -3,9 +3,11 @@
 **/
 #include <linux/types.h>
 #include <linux/errno.h>
-#include <linux/fs.h>
+#include <linux/stat.h>
+#include <asm/unistd.h>
 #include <drivers/disk.h>
 #include <sys_wrappers.h>
+#include <linux/fs.h>
 
 #include <lklvfs.h>
 
@@ -179,7 +181,7 @@ LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev)
 		goto out_free_mnt;
 
 	DbgPrint("Mounting %s in %s", devno_str, mnt);
-	if (try_mount(devno_str, mnt, 0, 0))
+	if (try_mount(devno_str, mnt, MS_RDONLY, 0))
 		goto out_del_mnt_dir;
 
 	lin_dev->ldisk = ldisk;
@@ -212,8 +214,7 @@ LONG sys_unmount_wrapper(PLINDEV ldev)
      if(!ldev)
          return -1;
 
-     sys_sync();
-     rc = sys_umount(ldev->mnt, 0x00000001);
+     rc = sys_umount(ldev->mnt, 0x00000002);
      if(rc <0)
            return rc;
 
@@ -222,4 +223,9 @@ LONG sys_unmount_wrapper(PLINDEV ldev)
      lkl_disk_del_disk(ldev->ldisk);
      
      return rc;
+}
+
+void sys_sync_wrapper()
+{
+     sys_sync();
 }

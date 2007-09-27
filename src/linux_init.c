@@ -93,6 +93,7 @@ int linux_new_thread(int (*fn)(void*), void *arg, void *pti)
 
 long linux_panic_blink(long time)
 {
+    DbgPrint("***Kernel panic!***");
 	while (1);
         return 0;
 }
@@ -231,7 +232,7 @@ NTSTATUS run_linux_kernel(void)
     KeInitializeEvent(&debug_thread_event, NotificationEvent, FALSE);
     KeInitializeEvent(&wait_for_me, NotificationEvent, FALSE);
     KeInitializeEvent(&good_to_go, NotificationEvent, FALSE);
-    
+     
 	status = PsCreateSystemThread(&lith, THREAD_ALL_ACCESS, NULL, NULL, NULL,
 			     linux_idle_thread, NULL);
     KeWaitForSingleObject(&good_to_go, Executive, KernelMode, FALSE, NULL);

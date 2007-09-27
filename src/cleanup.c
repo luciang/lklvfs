@@ -117,8 +117,10 @@ try_exit:
 		RELEASE(resource_acquired);
 	if (vcb_acquired)
 		RELEASE(&vcb->vcb_resource);
-	if (post_request)
+	if (post_request) {
+            DbgPrint("Post cleanup request");
 			status = LklPostRequest(irp_context, irp);
+        }
 	if (status != STATUS_PENDING){
 		FreeIrpContext(irp_context);
 		LklCompleteRequest(irp, status);
