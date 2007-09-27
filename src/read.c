@@ -29,7 +29,7 @@ NTSTATUS DDKAPI VfsRead(PDEVICE_OBJECT device, PIRP irp)
 	if(irp_context == NULL) {
         LklCompleteRequest(irp, STATUS_INSUFFICIENT_RESOURCES);
 		return STATUS_INSUFFICIENT_RESOURCES;
-    }
+	}
 	status = CommonRead(irp_context, irp);
 
 	if (top_level)
@@ -73,7 +73,7 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 		// Caller wants to tell the Cache Manager that a previously
 		// allocated MDL can be freed.
 		CcMdlReadComplete(file, irp->MdlAddress);
-        irp->MdlAddress = NULL;
+		irp->MdlAddress = NULL;
 		// The IRP has been completed.
 		complete_irp = FALSE;
 		TRY_RETURN(STATUS_SUCCESS);
@@ -81,7 +81,7 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 
 	// If this is a request at IRQL DISPATCH_LEVEL, then post the request
 	if (FLAG_ON(stack_location->MinorFunction,IRP_MN_DPC)) {
-        DbgPrint("post request");
+		DbgPrint("post request");
 		complete_irp = FALSE;
 		TRY_RETURN(STATUS_PENDING);
 	}
@@ -111,7 +111,7 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 
 	// We are asked to do a volume read
 	if (fcb->id.type == VCB) {
-                     	DbgPrint("VOLUME READ");
+		DbgPrint("VOLUME READ");
 		//TODO: We need to send this on to the disk driver after validation of the offset and length.
 		TRY_RETURN(STATUS_INVALID_PARAMETER);
 	}
@@ -120,68 +120,59 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 	CHECK_OUT(ccb->id.type != CCB || ccb->id.size !=sizeof(LKLCCB), STATUS_INVALID_PARAMETER);
 
  	DbgPrint("READ");
- 	 // BUG! BUG! BUG!
- 	  TRY_RETURN(STATUS_INVALID_PARAMETER);
+	// BUG! BUG! BUG!
+	TRY_RETURN(STATUS_INVALID_PARAMETER);
 	// Obtain any resources that are appropriate to ensure consistency of data.
-	 if (!pagingIo)
-        {
-            if (!ExAcquireResourceSharedLite(&fcb->fcb_resource, canWait))
-                TRY_RETURN(STATUS_PENDING);
-            fcb_resource_acq = TRUE;
-        }
-        else
-        {
-            if (!ExAcquireResourceSharedLite(&fcb->paging_resource, canWait))
-                TRY_RETURN(STATUS_PENDING);
-            paging_resource_acq = TRUE;
+	if (!pagingIo) {
+		if (!ExAcquireResourceSharedLite(&fcb->fcb_resource, canWait))
+			TRY_RETURN(STATUS_PENDING);
+		fcb_resource_acq = TRUE;
+        } else {
+		if (!ExAcquireResourceSharedLite(&fcb->paging_resource, canWait))
+			TRY_RETURN(STATUS_PENDING);
+		paging_resource_acq = TRUE;
         }
  
 	// Determine whether the byte range specified by the caller is valid, and if not,
 	// return an appropriate error code to the caller.
-	if ((byte_offset.QuadPart + (LONGLONG)length) > fcb->common_header.FileSize.QuadPart )
-    {
-		if (byte_offset.QuadPart >= fcb->common_header.FileSize.QuadPart)
-        {
-           irp->IoStatus.Information = 0;
-           TRY_RETURN(STATUS_END_OF_FILE);
-        }
-        length = (ULONG)(fcb->common_header.FileSize.QuadPart - byte_offset.QuadPart);
-    }
-
-	if (!nonBufferedIo)
-        {
-			// If this is a buffered I/O request and caching has not yet been initiated on the
-			// FCB, invoke CcInitializeCacheMap to initiate caching at this time.
-			if (file->PrivateCacheMap == NULL) {
-				CcInitializeCacheMap(file, (PCC_FILE_SIZES)(&fcb->common_header.AllocationSize),
-					FALSE, &lklfsd.cache_mgr_callbacks, ccb);
-			}
-			// If this is a buffered non-MDL I/O request, forward the request on to the NT
-			// Cache Manager via an invocation to CcCopyRead
-			if (FLAG_ON(stack_location->MinorFunction, IRP_MN_MDL))
-			{
-				CcMdlRead(file, &byte_offset, length, &irp->MdlAddress, &irp->IoStatus);
-				status = irp->IoStatus.Status;
-				numberBytesRead = irp->IoStatus.Information;
-			}
-			else {
-				//This is a regular cached I/O request. Let the Cache Manager worry about it.
-				userBuffer = GetUserBuffer(irp);
-				if (!CcCopyRead(file, &(byte_offset), length, canWait, userBuffer, &(irp->IoStatus))) {
-					// The caller was not prepared to block and data is not immediately available in the system cache.
-					complete_irp = FALSE;
-					TRY_RETURN(STATUS_PENDING);
-				}
-				// We have the data
-				status = irp->IoStatus.Status;
-				numberBytesRead = irp->IoStatus.Information;
-			}
-			// update the offset
-			file->CurrentByteOffset.QuadPart = byte_offset.QuadPart + numberBytesRead;
-		//	sys_lseek_wrapper(ccb->fd, byte_offset.QuadPart + numberBytesRead, 0);
-
+	if ((byte_offset.QuadPart + (LONGLONG)length) > fcb->common_header.FileSize.QuadPart ) {
+		if (byte_offset.QuadPart >= fcb->common_header.FileSize.QuadPart) {
+			irp->IoStatus.Information = 0;
+			TRY_RETURN(STATUS_END_OF_FILE);
+		}
+		length = (ULONG)(fcb->common_header.FileSize.QuadPart - byte_offset.QuadPart);
 	}
-	else {
+	
+	if (!nonBufferedIo) {
+		// If this is a buffered I/O request and caching has not yet been initiated on the
+		// FCB, invoke CcInitializeCacheMap to initiate caching at this time.
+		if (file->PrivateCacheMap == NULL) {
+			CcInitializeCacheMap(file, (PCC_FILE_SIZES)(&fcb->common_header.AllocationSize),
+					     FALSE, &lklfsd.cache_mgr_callbacks, ccb);
+		}
+		// If this is a buffered non-MDL I/O request, forward the request on to the NT
+		// Cache Manager via an invocation to CcCopyRead
+		if (FLAG_ON(stack_location->MinorFunction, IRP_MN_MDL))	{
+			CcMdlRead(file, &byte_offset, length, &irp->MdlAddress, &irp->IoStatus);
+			status = irp->IoStatus.Status;
+			numberBytesRead = irp->IoStatus.Information;
+		} else {
+			//This is a regular cached I/O request. Let the Cache Manager worry about it.
+			userBuffer = GetUserBuffer(irp);
+			if (!CcCopyRead(file, &(byte_offset), length, canWait, userBuffer, &(irp->IoStatus))) {
+				// The caller was not prepared to block and data is not immediately available in the system cache.
+				complete_irp = FALSE;
+				TRY_RETURN(STATUS_PENDING);
+			}
+			// We have the data
+			status = irp->IoStatus.Status;
+			numberBytesRead = irp->IoStatus.Information;
+		}
+		// update the offset
+		file->CurrentByteOffset.QuadPart = byte_offset.QuadPart + numberBytesRead;
+		//sys_lseek_wrapper(ccb->fd, byte_offset.QuadPart + numberBytesRead, 0);
+		
+	} else {
 		// Read from the disk
 		if (byte_offset.LowPart!=0 || byte_offset.HighPart!=0) {
 			//	if (byte_offset.LowPart == FILE_USE_FILE_POINTER_POSITION && byte_offset.HighPart == -1)
@@ -190,21 +181,19 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 					// lseek
 					// sys_lseek_wrapper(ccb->fd,byte_offset.LowPart, 0); 
 			//	}
-			}
-        DbgPrint("Read from DISK");
+		}
+		DbgPrint("Read from DISK");
 		//numberBytesRead = sys_read_wrapper(ccb->fd, userBuffer, length);
-	
 	}
 
 	if(numberBytesRead >=0) {
 		status = STATUS_SUCCESS;
 		irp->IoStatus.Information = numberBytesRead;
-	}
-	else {
+	} else {
 		status = STATUS_UNEXPECTED_IO_ERROR;
 		irp->IoStatus.Information = 0;
 	}
-
+	
 try_exit:
 	// Once data has been obtained either from the Cache Manager or from lower level
 	// drivers, release FCB resources acquired and return the results to the caller.
@@ -223,8 +212,7 @@ try_exit:
 			LklCompleteRequest(irp, status);
 			FreeIrpContext(irp_context);
 		}
-	}
-	else {
+	} else {
 		LklCompleteRequest(irp, status);
 		FreeIrpContext(irp_context);
 	}

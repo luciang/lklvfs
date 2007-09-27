@@ -25,58 +25,57 @@ NTSTATUS DDKAPI DriverEntry(IN PDRIVER_OBJECT driver,IN PUNICODE_STRING reg_path
 	irp_context_cachep = NULL;
 
 
-		RtlZeroMemory(&lklfsd, sizeof(lklfsd));
+	RtlZeroMemory(&lklfsd, sizeof(lklfsd));
 
-		DbgPrint("Loading LklVfs");
+	DbgPrint("Loading LklVfs");
 
-		// fs driver object
-		lklfsd.driver = driver;
-		status = ExInitializeResourceLite(&(lklfsd.global_resource));
-		CHECK_OUT(!NT_SUCCESS(status), status);
-		resource_init = TRUE;
+	// fs driver object
+	lklfsd.driver = driver;
+	status = ExInitializeResourceLite(&(lklfsd.global_resource));
+	CHECK_OUT(!NT_SUCCESS(status), status);
+	resource_init = TRUE;
 		
-		status = InitializeSysWrappers();
-		CHECK_OUT(!NT_SUCCESS(status), status);
-		// init mounted vcb list
-		InitializeListHead(&(lklfsd.vcb_list));
-		// create the FS device
-		RtlInitUnicodeString(&device_name, LKL_FS_NAME);
-		status = IoCreateDevice(driver, 0, &device_name, FILE_DEVICE_DISK_FILE_SYSTEM,
-					0, FALSE, &(lklfsd.device));
-		CHECK_OUT(!NT_SUCCESS(status), status);
-		// init function pointers to the dispatch routines
-		InitializeFunctionPointers(driver);
-		// init function pointers for the fast I/O
-		InitializeFastIO(driver);
-		// init cache manager callbacks
-		lklfsd.cache_mgr_callbacks.AcquireForLazyWrite = VfsAcqLazyWrite;
-		lklfsd.cache_mgr_callbacks.ReleaseFromLazyWrite = VfsRelLazyWrite;
-		lklfsd.cache_mgr_callbacks.AcquireForReadAhead = VfsAcqReadAhead;
-		lklfsd.cache_mgr_callbacks.ReleaseFromReadAhead = VfsRelReadAhead;			
+	status = InitializeSysWrappers();
+	CHECK_OUT(!NT_SUCCESS(status), status);
+	// init mounted vcb list
+	InitializeListHead(&(lklfsd.vcb_list));
+	// create the FS device
+	RtlInitUnicodeString(&device_name, LKL_FS_NAME);
+	status = IoCreateDevice(driver, 0, &device_name, FILE_DEVICE_DISK_FILE_SYSTEM,
+				0, FALSE, &(lklfsd.device));
+	CHECK_OUT(!NT_SUCCESS(status), status);
+	// init function pointers to the dispatch routines
+	InitializeFunctionPointers(driver);
+	// init function pointers for the fast I/O
+	InitializeFastIO(driver);
+	// init cache manager callbacks
+	lklfsd.cache_mgr_callbacks.AcquireForLazyWrite = VfsAcqLazyWrite;
+	lklfsd.cache_mgr_callbacks.ReleaseFromLazyWrite = VfsRelLazyWrite;
+	lklfsd.cache_mgr_callbacks.AcquireForReadAhead = VfsAcqReadAhead;
+	lklfsd.cache_mgr_callbacks.ReleaseFromReadAhead = VfsRelReadAhead;			
 
-		//init asynch initialization -- no need for it because we use system worker threads
-		//init event used for async irp processing in our kernel thread(s) -- the same
+	//init asynch initialization -- no need for it because we use system worker threads
+	//init event used for async irp processing in our kernel thread(s) -- the same
 
-		// init lookaside lists for our structures
-		ccb_cachep = ExAllocatePoolWithTag(NonPagedPool, sizeof(NPAGED_LOOKASIDE_LIST), 'bccL');
-		ASSERT(ccb_cachep);
-		fcb_cachep = ExAllocatePoolWithTag(NonPagedPool, sizeof(NPAGED_LOOKASIDE_LIST), 'bcfL');
-		ASSERT(fcb_cachep);
-		irp_context_cachep = ExAllocatePoolWithTag(NonPagedPool, sizeof(NPAGED_LOOKASIDE_LIST), 'priL');
-		ASSERT(irp_context_cachep);
-		ExInitializeNPagedLookasideList(ccb_cachep, NULL, NULL, 0, sizeof(LKLCCB),'bcC',0);
-		ExInitializeNPagedLookasideList(fcb_cachep, NULL, NULL, 0, sizeof(LKLFCB),'bcF',0);
-		ExInitializeNPagedLookasideList(irp_context_cachep, NULL, NULL, 0, sizeof(IRPCONTEXT),'cprI',0);
+	// init lookaside lists for our structures
+	ccb_cachep = ExAllocatePoolWithTag(NonPagedPool, sizeof(NPAGED_LOOKASIDE_LIST), 'bccL');
+	ASSERT(ccb_cachep);
+	fcb_cachep = ExAllocatePoolWithTag(NonPagedPool, sizeof(NPAGED_LOOKASIDE_LIST), 'bcfL');
+	ASSERT(fcb_cachep);
+	irp_context_cachep = ExAllocatePoolWithTag(NonPagedPool, sizeof(NPAGED_LOOKASIDE_LIST), 'priL');
+	ASSERT(irp_context_cachep);
+	ExInitializeNPagedLookasideList(ccb_cachep, NULL, NULL, 0, sizeof(LKLCCB),'bcC',0);
+	ExInitializeNPagedLookasideList(fcb_cachep, NULL, NULL, 0, sizeof(LKLFCB),'bcF',0);
+	ExInitializeNPagedLookasideList(irp_context_cachep, NULL, NULL, 0, sizeof(IRPCONTEXT),'cprI',0);
 
-		// create visible link to the fs device for unloading
-		RtlInitUnicodeString(&dos_name, LKL_DOS_DEVICE);
-		IoCreateSymbolicLink(&dos_name, &device_name);
+	// create visible link to the fs device for unloading
+	RtlInitUnicodeString(&dos_name, LKL_DOS_DEVICE);
+	IoCreateSymbolicLink(&dos_name, &device_name);
 
-		run_linux_kernel();
+	run_linux_kernel();
+
 try_exit:
-
-	if (!NT_SUCCESS(status))
-	{
+	if (!NT_SUCCESS(status)) {
 		// cleanup
 		FreeSysWrapperResources();
 		
@@ -92,14 +91,13 @@ try_exit:
 			ExFreePool(fcb_cachep);
 		if(irp_context_cachep)
 			ExFreePool(irp_context_cachep);
-
 	}
 
-    // register the fs
-    if(NT_SUCCESS(status)) {
-    	IoRegisterFileSystem(lklfsd.device);
-    	DbgPrint("LklVFS loaded succesfully");
-    }
+	// register the fs
+	if(NT_SUCCESS(status)) {
+		IoRegisterFileSystem(lklfsd.device);
+		DbgPrint("LklVFS loaded succesfully");
+	}
 	return status;
 }
 
@@ -157,8 +155,8 @@ VOID DDKAPI DriverUnload(PDRIVER_OBJECT driver)
 
 	DbgPrint("Unloading LklVfs");
 	
-    unload_linux_kernel();
-    FreeSysWrapperResources();
+	unload_linux_kernel();
+	FreeSysWrapperResources();
 	RtlInitUnicodeString(&dos_name, LKL_DOS_DEVICE);
 	IoDeleteSymbolicLink(&dos_name);
 	ExDeleteNPagedLookasideList(ccb_cachep);

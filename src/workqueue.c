@@ -10,8 +10,7 @@ NTSTATUS LklDispatchRequest(PIRPCONTEXT irp_context)
 	ASSERT(irp_context);
 	ASSERT((irp_context->id.type == IRP_CONTEXT) && (irp_context->id.size == sizeof(IRPCONTEXT)));
 
-	switch (irp_context->major_function)
-	{
+	switch (irp_context->major_function) {
 	case IRP_MJ_CREATE:
 		return CommonCreate(irp_context, irp_context->irp);
 
@@ -51,7 +50,7 @@ VOID DDKAPI LklDequeueRequest(IN PDEVICE_OBJECT device, IN PVOID context)
 
 	FsRtlEnterFileSystem();
 
-    status = LklDispatchRequest(irp_context);
+	status = LklDispatchRequest(irp_context);
 
 	FsRtlExitFileSystem();
 
@@ -67,7 +66,7 @@ NTSTATUS LklPostRequest(PIRPCONTEXT irp_context, PIRP irp)
 	IoMarkIrpPending(irp);
 	
 	irp_context->work_item = IoAllocateWorkItem(irp_context->target_device);
-    IoQueueWorkItem(irp_context->work_item, LklDequeueRequest, CriticalWorkQueue ,irp_context);
+	IoQueueWorkItem(irp_context->work_item, LklDequeueRequest, CriticalWorkQueue ,irp_context);
 
 	FreeIrpContext(irp_context);
 	return STATUS_PENDING;

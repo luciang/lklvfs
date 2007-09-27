@@ -42,17 +42,17 @@ try_exit:
 
 NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 {
-	NTSTATUS					status = STATUS_SUCCESS;
-	PERESOURCE					resource_acquired = NULL;
-	PIO_STACK_LOCATION			stack_location = NULL;
-	PLKLVCB						vcb = NULL;
-	PFILE_OBJECT				file = NULL;
-	PLKLFCB						fcb = NULL;
-	PLKLCCB						ccb;
-	BOOLEAN						freeVcb = FALSE;
-	BOOLEAN						vcbResourceAquired = FALSE;
-	BOOLEAN						postRequest = FALSE;
-	BOOLEAN						completeIrp = FALSE;
+	NTSTATUS status = STATUS_SUCCESS;
+	PERESOURCE resource_acquired = NULL;
+	PIO_STACK_LOCATION stack_location = NULL;
+	PLKLVCB vcb = NULL;
+	PFILE_OBJECT file = NULL;
+	PLKLFCB fcb = NULL;
+	PLKLCCB ccb;
+	BOOLEAN freeVcb = FALSE;
+	BOOLEAN vcbResourceAquired = FALSE;
+	BOOLEAN postRequest = FALSE;
+	BOOLEAN completeIrp = FALSE;
 
 	vcb=(PLKLVCB) irp_context->target_device->DeviceExtension;
 	CHECK_OUT(vcb == NULL, STATUS_DRIVER_INTERNAL_ERROR);
@@ -64,13 +64,12 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 
 	// never make a close request block
 	if (!ExAcquireResourceExclusiveLite(&vcb->vcb_resource, FALSE)) {
-			postRequest = TRUE;
-			TRY_RETURN(STATUS_PENDING);
-		}
-	else {
-			completeIrp = TRUE;
-			vcbResourceAquired = TRUE;
-		}
+		postRequest = TRUE;
+		TRY_RETURN(STATUS_PENDING);
+	} else {
+		completeIrp = TRUE;
+		vcbResourceAquired = TRUE;
+	}
 
 	// file object
 	file = stack_location->FileObject;
@@ -79,8 +78,7 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 	CHECK_OUT(fcb == NULL, STATUS_INVALID_PARAMETER);
 	
 	// volume close
-	if (fcb->id.type == VCB)
-	{
+	if (fcb->id.type == VCB) {
 		DbgPrint("VOLUME CLOSE");
 		InterlockedDecrement(&vcb->reference_count);
 		if (!vcb->reference_count && FLAG_ON(vcb->flags, VFS_VCB_FLAGS_BEING_DISMOUNTED)) {
@@ -96,10 +94,10 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 
 	// acquire fcb resource -  never block in close
 	 if (!ExAcquireResourceExclusiveLite(&(fcb->fcb_resource), FALSE)) {
-			postRequest = TRUE;
-			TRY_RETURN(STATUS_PENDING);
-		} else
-			resource_acquired = &(fcb->fcb_resource);
+		 postRequest = TRUE;
+		 TRY_RETURN(STATUS_PENDING);
+	 } else
+		 resource_acquired = &(fcb->fcb_resource);
 
 	// free ccb
 	RemoveEntryList(&ccb->next);
@@ -138,9 +136,7 @@ try_exit:
 		LklCompleteRequest(irp, status);
 		FreeIrpContext(irp_context);
 	}
-	if (freeVcb) {
+	if (freeVcb) 
 		FreeVcb(vcb);
-
-    }
 	return status;
 }

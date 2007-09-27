@@ -28,7 +28,7 @@ VOID CreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 	InitializeListHead(&(vcb->fcb_list));
 
 	FsRtlNotifyInitializeSync(&vcb->notify_irp_mutex);
-    InitializeListHead(&vcb->next_notify_irp);
+	InitializeListHead(&vcb->next_notify_irp);
 
 	vcb->common_header.AllocationSize.QuadPart = alloc_size->QuadPart;
 	vcb->common_header.FileSize.QuadPart = alloc_size->QuadPart;
@@ -45,14 +45,14 @@ VOID CreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 
 VOID FreeVcb(PLKLVCB vcb)
 {
-     LONG rc;
+	LONG rc;
      
-     if(vcb == NULL)
-            return;
-     if(vcb->id.type != VCB || vcb->id.size !=sizeof(LKLVCB))
-            return;
-     if(!FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VCB_INITIALIZED))
-            return;
+	if(vcb == NULL)
+		return;
+	if(vcb->id.type != VCB || vcb->id.size !=sizeof(LKLVCB))
+		return;
+	if(!FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VCB_INITIALIZED))
+		return;
    
 	ClearVpbFlag(vcb->vpb, VPB_MOUNTED);
 
@@ -72,7 +72,7 @@ PLKLFCB AllocFcb()
 	fcb = ExAllocateFromNPagedLookasideList(fcb_cachep);
 	if (!fcb)
 		return NULL;
- 
+	
 	RtlZeroMemory(fcb, sizeof(LKLFCB));
 	fcb->id.type = FCB;
 	fcb->id.size = sizeof(LKLFCB);
@@ -85,11 +85,12 @@ VOID FreeFcb(PLKLFCB fcb)
 {
      if(fcb == NULL)
             return;
-	RtlFreeUnicodeString(&fcb->name);
 
-	ExDeleteResourceLite(&fcb->fcb_resource);
-	ExDeleteResourceLite(&fcb->paging_resource);
-	ExFreeToNPagedLookasideList(fcb_cachep, fcb);
+     RtlFreeUnicodeString(&fcb->name);
+
+     ExDeleteResourceLite(&fcb->fcb_resource);
+     ExDeleteResourceLite(&fcb->paging_resource);
+     ExFreeToNPagedLookasideList(fcb_cachep, fcb);
 }
 
 
@@ -125,7 +126,7 @@ NTSTATUS CreateFcb(PLKLFCB *new_fcb, PFILE_OBJECT file_obj, PLKLVCB vcb, ULONG i
 	fcb->section_object.SharedCacheMap = NULL;
 	fcb->section_object.ImageSectionObject = NULL;
 	
-    InitializeListHead(&(fcb->ccb_list));
+	InitializeListHead(&(fcb->ccb_list));
     
 	InsertTailList(&(vcb->fcb_list), &(fcb->next));
 
@@ -170,8 +171,8 @@ NTSTATUS CreateNewCcb(PLKLCCB *new_ccb, PLKLFCB fcb, PFILE_OBJECT file_obj)
 	ccb->fcb = fcb;
 	ccb->file_obj = file_obj;
 	ccb->offset.QuadPart = 0;
-    ccb->search_pattern.Length = 0;
-    ccb->search_pattern.Buffer = NULL;
+	ccb->search_pattern.Length = 0;
+	ccb->search_pattern.Buffer = NULL;
     
 	InterlockedIncrement(&fcb->reference_count);
 	InterlockedIncrement(&fcb->handle_count);

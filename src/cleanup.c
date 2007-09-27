@@ -67,21 +67,18 @@ NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp)
 	fcb = file->FsContext;
 	ASSERT(fcb);
 	// clean on volume object
-	if (fcb->id.type == VCB)
-    {
-        if (FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VOLUME_LOCKED))
-        {
-            CLEAR_FLAG(vcb->flags, VFS_VCB_FLAGS_VOLUME_LOCKED);
-            ClearVpbFlag(vcb->vpb, VPB_LOCKED);
-        }
-        TRY_RETURN(STATUS_SUCCESS);
-    }
+	if (fcb->id.type == VCB) {
+		if (FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VOLUME_LOCKED)) {
+			CLEAR_FLAG(vcb->flags, VFS_VCB_FLAGS_VOLUME_LOCKED);
+			ClearVpbFlag(vcb->vpb, VPB_LOCKED);
+		}
+		TRY_RETURN(STATUS_SUCCESS);
+	}
 
 	if (!ExAcquireResourceExclusiveLite(&(fcb->fcb_resource), canWait)) {
-			post_request = TRUE;
-			TRY_RETURN(STATUS_PENDING);
-		}
-	else
+		post_request = TRUE;
+		TRY_RETURN(STATUS_PENDING);
+	} else
 		resource_acquired = &(fcb->fcb_resource);
 
 	CHECK_OUT(fcb->handle_count== 0, STATUS_INVALID_PARAMETER);
@@ -91,28 +88,27 @@ NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp)
 
 	//invoking the flush call explicitly could be useful
 	if (file->PrivateCacheMap != NULL)
-				CcFlushCache(file->SectionObjectPointer, NULL, 0, &iosb);
+		CcFlushCache(file->SectionObjectPointer, NULL, 0, &iosb);
 
 	//uninitialize cache map even if caching hasn't been initialized
 	CcUninitializeCacheMap(file, NULL, NULL);
 
 	IoRemoveShareAccess(file, &fcb->share_access);
 
-	if (fcb->handle_count == 0)
-        {
-            if (FLAG_ON(fcb->flags, VFS_FCB_DELETE_PENDING))
-            {
-				DbgPrint("DELETE PENDIND SET IN CLEANUP");
-
-                //must delete this file ??
-            }
+	if (fcb->handle_count == 0) {
+		if (FLAG_ON(fcb->flags, VFS_FCB_DELETE_PENDING)) {
+			DbgPrint("DELETE PENDIND SET IN CLEANUP");
+			//must delete this file ??
+		}
         }
 
-	/*If the cleanup operation is for a directory, we have to complete any
-	pending notify IRPs for the file object.*/
-/*	if (FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY))
-       FsRtlNotifyCleanup(&vcb->notify_irp_mutex, &vcb->next_notify_irp, file->FsContext2);
-*/
+	/*
+	 * If the cleanup operation is for a directory, we have to complete any
+	 * pending notify IRPs for the file object.
+	 */
+	//if (FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY))
+	//FsRtlNotifyCleanup(&vcb->notify_irp_mutex, &vcb->next_notify_irp, file->FsContext2);
+
 try_exit:
 
 	if (file)

@@ -53,8 +53,8 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 	LARGE_INTEGER AllocationSize;
 	ULONG ioctlSize;
 	PSTR dev_name;
-    STATFS my_stat;
-    ULONG rc;
+	STATFS my_stat;
+	ULONG rc;
     
 	CHECK_OUT(dev == lklfsd.device, STATUS_INVALID_DEVICE_REQUEST);
 
@@ -64,27 +64,31 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 
 	// if this succeeds...
 	status = IoCreateDevice(lklfsd.driver, sizeof(LKLVCB), NULL,
-			FILE_DEVICE_DISK_FILE_SYSTEM, 0, FALSE, &volume_device);
+				FILE_DEVICE_DISK_FILE_SYSTEM, 0, FALSE, &volume_device);
 	CHECK_OUT(!NT_SUCCESS(status), status);
 	if (dev->AlignmentRequirement > volume_device->AlignmentRequirement)
-			volume_device->AlignmentRequirement = dev->AlignmentRequirement;
+		volume_device->AlignmentRequirement = dev->AlignmentRequirement;
 	
 	CLEAR_FLAG(volume_device->Flags, DO_DEVICE_INITIALIZING);
 	volume_device->StackSize = (CCHAR)(dev->StackSize+1);
 
-    CreateVcb(volume_device,dev,vpb,&AllocationSize);
+	CreateVcb(volume_device,dev,vpb,&AllocationSize);
 	if(!FLAG_ON(((PLKLVCB)volume_device->DeviceExtension)->flags, VFS_VCB_FLAGS_VCB_INITIALIZED))
 		TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
     
 	// yup, here we read the disk geometry
 	ioctlSize = sizeof(DISK_GEOMETRY);
-	status = BlockDeviceIoControl(dev, IOCTL_DISK_GET_DRIVE_GEOMETRY,
-		NULL, 0, &((PLKLVCB)volume_device->DeviceExtension)->disk_geometry, &ioctlSize);
+	status = BlockDeviceIoControl(dev, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL,
+				      0,
+				      &((PLKLVCB)volume_device->DeviceExtension)->disk_geometry,
+				      &ioctlSize);
 	CHECK_OUT(!NT_SUCCESS(status), status);
 
 	ioctlSize = sizeof(PARTITION_INFORMATION);
-	status = BlockDeviceIoControl(dev, IOCTL_DISK_GET_PARTITION_INFO,
-		NULL, 0, &((PLKLVCB)volume_device->DeviceExtension)->partition_information, &ioctlSize);
+	status = BlockDeviceIoControl(dev, IOCTL_DISK_GET_PARTITION_INFO, NULL,
+				      0,
+				      &((PLKLVCB)volume_device->DeviceExtension)->partition_information,
+				      &ioctlSize);
 	CHECK_OUT(!NT_SUCCESS(status), status);
 	
 	// try a linux mount if this fails, then we fail to mount
@@ -95,7 +99,7 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 	dev_name = CopyStringAppendULong("device", 6, lklfsd.no_mounts);
 	DbgPrint("Mounting device '%s'", dev_name);
 	status=sys_mount_wrapper(vcb->target_device, dev_name, &vcb->linux_device);
-    ExFreePool(dev_name);
+	ExFreePool(dev_name);
    	RELEASE(&(lklfsd.global_resource));
 	CHECK_OUT(!NT_SUCCESS(status), status);
 	
@@ -111,16 +115,16 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 
 try_exit:
 
-		if(!NT_SUCCESS(status))
-		{
-            lklfsd.no_mounts--;
-			if(volume_device) {
-                FreeVcb((PLKLVCB) volume_device->DeviceExtension);
-				IoDeleteDevice(volume_device);
-            }
-
+	if(!NT_SUCCESS(status))
+	{
+		lklfsd.no_mounts--;
+		if(volume_device) {
+			FreeVcb((PLKLVCB) volume_device->DeviceExtension);
+			IoDeleteDevice(volume_device);
 		}
-
+		
+	}
+	
 	return status;
 }
 
@@ -220,7 +224,7 @@ NTSTATUS DDKAPI VfsLockVolume(PIRP irp, PIO_STACK_LOCATION stack_location)
 	// purge volume
 	VfsPurgeVolume(vcb, TRUE);
 
-    ExAcquireResourceExclusiveLite(&vcb->vcb_resource, TRUE);
+	ExAcquireResourceExclusiveLite(&vcb->vcb_resource, TRUE);
 	resource_acquired = TRUE;
 	
 	// if there are still open referneces we can't lock the volume
@@ -236,12 +240,12 @@ NTSTATUS DDKAPI VfsLockVolume(PIRP irp, PIO_STACK_LOCATION stack_location)
 	status = STATUS_SUCCESS;
 	
 try_exit:
-
-		if (resource_acquired)
-			RELEASE(&vcb->vcb_resource);
-		if (!NT_SUCCESS(status) && notified)
-			FsRtlNotifyVolumeEvent(file_obj, FSRTL_VOLUME_LOCK_FAILED);
-
+	
+	if (resource_acquired)
+		RELEASE(&vcb->vcb_resource);
+	if (!NT_SUCCESS(status) && notified)
+		FsRtlNotifyVolumeEvent(file_obj, FSRTL_VOLUME_LOCK_FAILED);
+	
 	return status;
 }
 
@@ -292,9 +296,9 @@ VOID DDKAPI VfsPurgeVolume(PLKLVCB vcb, BOOLEAN flush_before_purge)
 		ExAcquireResourceExclusiveLite(&fcb->fcb_resource, TRUE);
 		// reference them, so they dont get closed while we do the purge
 		InterlockedIncrement(&fcb->reference_count);
-
+		
 		RELEASE(&fcb->fcb_resource);
-
+		
 		fcb_list_entry = ExAllocatePool(NonPagedPool, sizeof(FCB_LIST_ENTRY));
 		InsertTailList(&fcb_list, &fcb_list_entry->next);
 	}
@@ -321,12 +325,12 @@ VOID DDKAPI VfsPurgeVolume(PLKLVCB vcb, BOOLEAN flush_before_purge)
 
 	if (vcb_acquired)
 		RELEASE(&vcb->vcb_resource);
-
 }
 
 VOID SetVpbFlag(PVPB vpb,IN USHORT flag)
 {
 	KIRQL irql;
+
 	IoAcquireVpbSpinLock(&irql);
 	vpb->Flags |= flag;
 	IoReleaseVpbSpinLock(irql);
@@ -335,6 +339,7 @@ VOID SetVpbFlag(PVPB vpb,IN USHORT flag)
 VOID ClearVpbFlag(PVPB vpb,IN USHORT flag)
 {
 	KIRQL irql;
+
 	IoAcquireVpbSpinLock(&irql);
 	vpb->Flags &= ~flag;
 	IoReleaseVpbSpinLock(irql);
@@ -371,8 +376,8 @@ NTSTATUS DDKAPI VfsUnLockVolume(PIRP irp, PIO_STACK_LOCATION stack_location)
 	DbgPrint("*** Volume UNLOCKED ***");
 
 	status = STATUS_SUCCESS;
-try_exit:
 
+try_exit:
 	if (vcb_acquired)
 		RELEASE(&vcb->vcb_resource);
 	FsRtlNotifyVolumeEvent(file_obj, FSRTL_VOLUME_UNLOCK);
@@ -386,11 +391,11 @@ NTSTATUS LklUmount(IN PDEVICE_OBJECT dev,IN PFILE_OBJECT file)
 	PLKLVCB vcb=NULL;
 	BOOLEAN notified = FALSE;
 	BOOLEAN vcb_acquired = FALSE;
-    INT rc;
+	INT rc;
     
 	vcb=(PLKLVCB) dev->DeviceExtension;
 	if (vcb == NULL)
-	   return STATUS_INVALID_PARAMETER;
+		return STATUS_INVALID_PARAMETER;
 	   
 	DbgPrint("Volume beeing DISMOUNTED");
 
@@ -401,23 +406,25 @@ NTSTATUS LklUmount(IN PDEVICE_OBJECT dev,IN PFILE_OBJECT file)
 	status=STATUS_SUCCESS;
 
 	if (!FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VOLUME_LOCKED)) {
-			VfsReportError("Volume is NOT LOCKED");
-			return(STATUS_ACCESS_DENIED);
-		}
+		VfsReportError("Volume is NOT LOCKED");
+		return(STATUS_ACCESS_DENIED);
+	}
   
-    DbgPrint("Unmounting device %s", vcb->linux_device.mnt);
-    rc = sys_unmount_wrapper(&vcb->linux_device); 
-  
-    if(rc<0) {
-            DbgPrint("Unmount failed with error code: %d", rc);
-            status = -rc; 
-    }        
-    if(NT_SUCCESS(status))
-            SET_FLAG(vcb->flags, VFS_VCB_FLAGS_BEING_DISMOUNTED);
+	DbgPrint("Unmounting device %s", vcb->linux_device.mnt);
+	rc = sys_unmount_wrapper(&vcb->linux_device); 
+	
+	if (rc<0) {
+		DbgPrint("Unmount failed with error code: %d", rc);
+		status = -rc; 
+	}        
+
+	if (NT_SUCCESS(status))
+		SET_FLAG(vcb->flags, VFS_VCB_FLAGS_BEING_DISMOUNTED);
 	if (vcb_acquired)
-			RELEASE(&vcb->vcb_resource);
+		RELEASE(&vcb->vcb_resource);
 	if (!NT_SUCCESS(status) && notified)
 		FsRtlNotifyVolumeEvent(file, FSRTL_VOLUME_DISMOUNT_FAILED);
+
 	return status;
 }
 
@@ -436,7 +443,6 @@ NTSTATUS DDKAPI VfsUnmountVolume(PIRP irp, PIO_STACK_LOCATION stack_location)
 	status = LklUmount(device, file_obj);
 
 try_exit:
-
 	return status;
 }
 
@@ -467,8 +473,8 @@ NTSTATUS DDKAPI VfsVerifyVolume(PIRP irp, PIO_STACK_LOCATION stack_location)
 	CLEAR_FLAG(vcb->target_device->Flags, DO_VERIFY_VOLUME);
 
 	status = STATUS_SUCCESS;
-try_exit:
 
+try_exit:
 	if (vcb_acquired)
 		RELEASE(&vcb->vcb_resource);
 

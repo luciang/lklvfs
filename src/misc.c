@@ -17,7 +17,7 @@ BOOLEAN LklIsIrpTopLevel(PIRP irp)
 VOID LklCompleteRequest(PIRP irp, NTSTATUS status)
 {
 	if (irp != NULL) {
-		if (!NT_SUCCESS(status) && FLAG_ON(irp->Flags, IRP_INPUT_OPERATION))
+		if (!NT_SUCCESS(status) && FLAG_ON(irp->Flags,IRP_INPUT_OPERATION))
 			irp->IoStatus.Information = 0;
 		irp->IoStatus.Status = status;
 
@@ -68,18 +68,18 @@ PSTR VfsCopyUnicodeStringToZcharUnixPath(PSTR root_path, USHORT root_path_len,
 	int i, length;
 	PSTR dest;
     
-    if(rel_name == NULL )
-        name_length = 0;
+	if(rel_name == NULL )
+		name_length = 0;
         
 	length = src->Length / sizeof(WCHAR);
 	dest = ExAllocatePoolWithTag(NonPagedPool, root_path_len + length + name_length + 1, 'RHCU');
 	if (!dest)
 		return NULL;
-		
+	
 	for(i = 0; i < root_path_len; i++) {
-          dest[i] = (char) root_path[i];
-    }
-    
+		dest[i] = (char) root_path[i];
+	}
+	
 	for (i = 0; i < length; i++) {
 		dest[root_path_len + i] = (char)src->Buffer[i];
 		if (dest[root_path_len + i] == '\\') dest[root_path_len + i] = '/';
@@ -88,72 +88,71 @@ PSTR VfsCopyUnicodeStringToZcharUnixPath(PSTR root_path, USHORT root_path_len,
 	root_path_len = root_path_len + length;
 	
 	if(dest[root_path_len-1] != '/') {
-	  dest[root_path_len] = '/';
-	  root_path_len++;
-   }
-    for(i = 0; i < name_length; i++) {
-          dest[root_path_len+i] = (char) rel_name[i];
-    }
-    dest[root_path_len + name_length] = 0;
-    
+		dest[root_path_len] = '/';
+		root_path_len++;
+	}
+	for(i = 0; i < name_length; i++) {
+		dest[root_path_len+i] = (char) rel_name[i];
+	}
+	dest[root_path_len + name_length] = 0;
+	
 	return dest;
 }
 
 PSTR CopyAppendUStringToZcharUnixPath(PUNICODE_STRING src, PSTR rel_name, USHORT name_length)
 {
-     int i, length;
-     PSTR dest;
-     
-     length = src->Length / sizeof(WCHAR);
-     dest = ExAllocatePoolWithTag(NonPagedPool, length + name_length + 1, 'RHCU');
-     if(!dest)
-      return NULL;
-     for (i = 0; i < length; i++) {
+	int i, length;
+	PSTR dest;
+	
+	length = src->Length / sizeof(WCHAR);
+	dest = ExAllocatePoolWithTag(NonPagedPool, length + name_length + 1, 'RHCU');
+	if(!dest)
+		return NULL;
+	for (i = 0; i < length; i++) {
 		dest[i] = (char)src->Buffer[i];
 		if (dest[i] == '\\') dest[i] = '/';
 	}
 	if(dest[length-1] != '/') {
-	  dest[length] = '/';
-	  length++;
-   }
-    for(i = 0; i < name_length; i++) {
-          dest[length+i] = (char) rel_name[i];
-    }
-    dest[length+name_length] = 0;
-    
-    return dest;
+		dest[length] = '/';
+		length++;
+	}
+	for(i = 0; i < name_length; i++) {
+		dest[length+i] = (char) rel_name[i];
+	}
+	dest[length+name_length] = 0;
+	
+	return dest;
 }
 
 // for device name
 PSTR CopyStringAppendULong(PSTR src, USHORT src_length, ULONG number)
 {
-    PSTR dest;
-    int i, letter;
-    dest = ExAllocatePoolWithTag(NonPagedPool, 255,'RAHC');
-    if(!dest)
-        return NULL;
-    RtlZeroMemory(dest, 255);
-    
+	PSTR dest;
+	int i, letter;
+	dest = ExAllocatePoolWithTag(NonPagedPool, 255,'RAHC');
+	if(!dest)
+		return NULL;
+	RtlZeroMemory(dest, 255);
+	
 	for(i = 0; i < src_length; i++) {
-      dest[i] = (char) src[i];
-      }
-    while(number>0) {
-         letter = number % 10;
-         dest[i++] = (char) ('0' + letter);
-         number = number /10;
-    }
-    
-    return dest;
+		dest[i] = (char) src[i];
+	}
+	while(number>0) {
+		letter = number % 10;
+		dest[i++] = (char) ('0' + letter);
+		number = number /10;
+	}
+	
+	return dest;
 }
 
 void VfsCopyUnicodeString(PUNICODE_STRING dest, PUNICODE_STRING src)
 {
-	
 	dest->Length = src->Length;
 	dest->MaximumLength = src->MaximumLength = src->Length+2;
 	dest->Buffer = ExAllocatePoolWithTag(NonPagedPool, dest->MaximumLength, 'RAHC');
-    if(dest->Buffer == NULL)
-       return;
+	if(dest->Buffer == NULL)
+		return;
 	RtlCopyUnicodeString(dest, src);
 }
 
@@ -165,25 +164,26 @@ VOID VfsReportError(const char * string)
 }
 
 // will need this for reading the partition table and find out the partition size
-NTSTATUS BlockDeviceIoControl(IN PDEVICE_OBJECT DeviceObject, IN ULONG	IoctlCode,
-								   IN PVOID	InputBuffer, IN ULONG InputBufferSize, 
-								   IN OUT PVOID OutputBuffer, IN OUT PULONG OutputBufferSize)
+NTSTATUS BlockDeviceIoControl(IN PDEVICE_OBJECT DeviceObject,
+			      IN ULONG IoctlCode, IN PVOID InputBuffer,
+			      IN ULONG InputBufferSize,
+			      IN OUT PVOID OutputBuffer,
+			      IN OUT PULONG OutputBufferSize)
 {
-	ULONG			OutputBufferSize2 = 0;
-	KEVENT			Event;
-	PIRP			Irp;
-	IO_STATUS_BLOCK	IoStatus;
-	NTSTATUS		Status;
+	ULONG OutputBufferSize2 = 0;
+	KEVENT Event;
+	PIRP Irp;
+	IO_STATUS_BLOCK IoStatus;
+	NTSTATUS Status;
 
 	ASSERT(DeviceObject != NULL);
 
-	if (OutputBufferSize)
-	{
+	if (OutputBufferSize) {
 		OutputBufferSize2 = *OutputBufferSize;
 	}
-
+	
 	KeInitializeEvent(&Event, NotificationEvent, FALSE);
-
+	
 	Irp = IoBuildDeviceIoControlRequest(IoctlCode, DeviceObject, InputBuffer, InputBufferSize,
 		OutputBuffer, OutputBufferSize2, FALSE, &Event, &IoStatus);
 	if (!Irp) {
@@ -191,13 +191,13 @@ NTSTATUS BlockDeviceIoControl(IN PDEVICE_OBJECT DeviceObject, IN ULONG	IoctlCode
 	}
 
 	Status = IoCallDriver(DeviceObject, Irp);
-	if (Status == STATUS_PENDING)
-	{
+
+	if (Status == STATUS_PENDING) {
 		KeWaitForSingleObject(&Event, Executive, KernelMode, FALSE, NULL);
 		Status = IoStatus.Status;
 	}
-	if (OutputBufferSize)
-	{
+
+	if (OutputBufferSize) {
 		*OutputBufferSize = (ULONG) IoStatus.Information;
 	}
 
@@ -207,38 +207,39 @@ NTSTATUS BlockDeviceIoControl(IN PDEVICE_OBJECT DeviceObject, IN ULONG	IoctlCode
 PVOID GetUserBuffer(IN PIRP Irp)
 {
     if (Irp->MdlAddress) {
-        return MmGetSystemAddressForMdlSafe(Irp->MdlAddress, NormalPagePriority);
+	    return MmGetSystemAddressForMdlSafe(Irp->MdlAddress, NormalPagePriority);
     } else {
-        return Irp->UserBuffer;
+	    return Irp->UserBuffer;
     }
 }
 
 NTSTATUS LockUserBuffer(IN PIRP Irp, IN ULONG Length, IN LOCK_OPERATION Operation)
 {
-    NTSTATUS Status;
-
-    ASSERT(Irp != NULL);
-
-    if (Irp->MdlAddress != NULL) {
-        return STATUS_SUCCESS;
-    }
-    IoAllocateMdl(Irp->UserBuffer, Length, FALSE, FALSE, Irp);
-    if (Irp->MdlAddress == NULL) {
-        return STATUS_INSUFFICIENT_RESOURCES;
-    }
-
-//    try
-  //  {
+	NTSTATUS Status;
+	
+	ASSERT(Irp != NULL);
+	
+	if (Irp->MdlAddress != NULL) {
+		return STATUS_SUCCESS;
+	}
+	IoAllocateMdl(Irp->UserBuffer, Length, FALSE, FALSE, Irp);
+	if (Irp->MdlAddress == NULL) {
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+	
+	//FIXME
+	//try
+	//{
         MmProbeAndLockPages(Irp->MdlAddress, Irp->RequestorMode, Operation);
         Status = STATUS_SUCCESS;
-    //}
-   /// except (EXCEPTION_EXECUTE_HANDLER)
-    //{
-      //  IoFreeMdl(Irp->MdlAddress);
-       // Irp->MdlAddress = NULL;
-       // Status = STATUS_INVALID_USER_BUFFER;
-    //}
-    return Status;
+	//}
+	/// except (EXCEPTION_EXECUTE_HANDLER)
+	//{
+	//  IoFreeMdl(Irp->MdlAddress);
+	// Irp->MdlAddress = NULL;
+	// Status = STATUS_INVALID_USER_BUFFER;
+	//}
+	return Status;
 }
 
 

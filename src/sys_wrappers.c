@@ -17,87 +17,86 @@ extern int sprintf(char * buf, const char * fmt, ...)
 
 NTSTATUS InitializeSysWrappers()
 {
-         // do whatever kind of initialization here
+	// do whatever kind of initialization here
          
-         return STATUS_SUCCESS;
+	return STATUS_SUCCESS;
 }
 
 void FreeSysWrapperResources()
 {
-     // free all used resources here
-
+	// free all used resources here
 }
 
 LONG sys_open_wrapper(PCSTR pathName, INT flags, INT mode)
 {
-     LONG rc;
+	LONG rc;
      
-     rc = sys_open(pathName, flags, mode);
-     
-     return rc;
+	rc = sys_open(pathName, flags, mode);
+	
+	return rc;
 }
 
 LONG sys_close_wrapper(UINT fd)
 {
-     LONG rc;
-     
-     rc = sys_close(fd);
-     
-     return rc;
+	LONG rc;
+	
+	rc = sys_close(fd);
+	
+	return rc;
 }
 
 LONG sys_read_wrapper(UINT fd, IN PVOID buf, ULONG size)
 {
-      LONG rc;
-      
-      rc = sys_read(fd, (char*) buf, size);
-      
-      return rc;
+	LONG rc;
+	
+	rc = sys_read(fd, (char*) buf, size);
+	
+	return rc;
 }
 
 LONG sys_lseek_wrapper(UINT fd, off_t offset, UINT origin)
 {
-     LONG rc;
-     
-     rc = sys_lseek(fd, offset, origin);
-     
-     return rc;
+	LONG rc;
+	
+	rc = sys_lseek(fd, offset, origin);
+	
+	return rc;
 }
 
 LONG sys_newfstat_wrapper(UINT fd, OUT PSTATS stat_buff)
 {
-     LONG rc;
-     
-     rc = sys_newfstat(fd, stat_buff);
-     
-     return rc;
+	LONG rc;
+	
+	rc = sys_newfstat(fd, stat_buff);
+	
+	return rc;
 }
 
 LONG sys_newstat_wrapper(IN PSTR filename,OUT PSTATS statbuf)
 {
-     LONG rc;
-     
-     rc = sys_newstat(filename, statbuf);
-     
-     return rc;
+	LONG rc;
+	
+	rc = sys_newstat(filename, statbuf);
+	
+	return rc;
 }
 
 LONG sys_statfs_wrapper(PCSTR path, OUT PSTATFS statfs_buff)
 {
-     LONG rc;
-     
-     rc = sys_statfs(path, statfs_buff);
-   
-     return rc;
+	LONG rc;
+	
+	rc = sys_statfs(path, statfs_buff);
+	
+	return rc;
 }
 
 LONG sys_getdents_wrapper(UINT fd, OUT PDIRENT dirent, UINT count)
 {
-     LONG rc;
-     
-     rc = sys_getdents(fd, dirent, count);
-     
-     return rc;
+	LONG rc;
+	
+	rc = sys_getdents(fd, dirent, count);
+	
+	return rc;
 }
 
 
@@ -109,7 +108,7 @@ static void get_fs_names(char *page)
 	char *s = page;
 	int len = get_filesystem_list(page);
 	char *p, *next;
-
+	
 	page[len] = '\0';
 	for (p = page-1; p; p = next) {
 		next = strchr(++p, '\n');
@@ -119,7 +118,7 @@ static void get_fs_names(char *page)
 			;
 		s[-1] = '\0';
 	}
-
+	
 	*s = '\0';
 }
 
@@ -130,7 +129,7 @@ static int try_mount(char *devno_str, char *mnt, int flags, void *data)
 {
 	int err;
 	char *p, *fs_names=ExAllocatePool(PagedPool, PAGE_SIZE);
-
+	
 	get_fs_names(fs_names);
 retry:
 	for (p = fs_names; *p; p += strlen(p)+1) {
@@ -212,14 +211,15 @@ LONG sys_unmount_wrapper(PLINDEV ldev)
      
      if(!ldev)
          return -1;
+
      sys_sync();
      rc = sys_umount(ldev->mnt, 0x00000001);
      if(rc <0)
            return rc;
 
-    sys_unlink(ldev->mnt);
-	sys_unlink(ldev->devno_str);
-	lkl_disk_del_disk(ldev->ldisk);
-	
-	return rc;
+     sys_unlink(ldev->mnt);
+     sys_unlink(ldev->devno_str);
+     lkl_disk_del_disk(ldev->ldisk);
+     
+     return rc;
 }

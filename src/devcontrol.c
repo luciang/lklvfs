@@ -94,7 +94,7 @@ NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp)
 try_exit:
 
 	if (acq_resource)
-			RELEASE(&lklfsd.global_resource);
+		RELEASE(&lklfsd.global_resource);
 
 	return status;
 }
