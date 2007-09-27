@@ -115,7 +115,7 @@ NTSTATUS filldir(struct dirent_buffer * buf, IN PCHAR name, int namlen, ULONG of
 	}
 	
 	file_name.Length = file_name.MaximumLength = namlen * 2;
-	file_name.Buffer = ExAllocateFromNPagedLookasideList(name_cachep);
+	file_name.Buffer = ExAllocatePoolWithTag(NonPagedPool, file_name.MaximumLength, 'RHCU');
 	CharToWchar(file_name.Buffer, (char*)name, namlen);
 
 	// make the full path for stat
@@ -190,7 +190,7 @@ NTSTATUS filldir(struct dirent_buffer * buf, IN PCHAR name, int namlen, ULONG of
 		}
 	}
     
-	FreeUnixPathString(file_name.Buffer);
+	RtlFreeUnicodeString(&file_name);
 	
 	buf->status = STATUS_SUCCESS;
 	return STATUS_SUCCESS;

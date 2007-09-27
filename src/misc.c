@@ -71,12 +71,12 @@ PSTR VfsCopyUnicodeStringToZcharUnixPath(PSTR root_path, USHORT root_path_len,
 		name_length = 0;
         
 	length = src->Length / sizeof(WCHAR);
-	dest = ExAllocateFromNPagedLookasideList(name_cachep);
+	dest = ExAllocatePoolWithTag(NonPagedPool, root_path_len + length + name_length + 2, 'RHCU');
 
 	if (!dest)
 		return NULL;
 		
-	RtlZeroMemory(dest, STR_MAX_LEN);
+	RtlZeroMemory(dest, root_path_len + length + name_length+2);
 
 	for(i = 0; i < root_path_len; i++) {
 		dest[i] = (char) root_path[i];
@@ -128,17 +128,17 @@ PSTR CopyAppendUStringToZcharUnixPath(PUNICODE_STRING src, PSTR rel_name, USHORT
 
 void FreeUnixPathString(PSTR name)
 {
-     ExFreeToNPagedLookasideList(name_cachep, name);
+     ExFreePool(name);
 }
 // for device name
 PSTR CopyStringAppendULong(PSTR src, USHORT src_length, ULONG number)
 {
 	PSTR dest;
 	int i, letter;
-	dest = ExAllocatePoolWithTag(NonPagedPool, STR_MAX_LEN,'RAHC');
+	dest = ExAllocatePoolWithTag(NonPagedPool, 255, 'RAHC');
 	if(!dest)
 		return NULL;
-	RtlZeroMemory(dest, STR_MAX_LEN);
+	RtlZeroMemory(dest, 255);
     
 	for(i = 0; i < src_length; i++) {
 		dest[i] = (char) src[i];

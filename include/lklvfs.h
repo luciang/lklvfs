@@ -6,11 +6,8 @@
 
 #include <sys_wrappers.h>
 
-//FIXME: why do we need this?
-#define LKL_DEVICE              L"\\DosDevices\\F:"
 #define LKL_FS_NAME             L"\\lklvfs"
 #define LKL_DOS_DEVICE  L"\\DosDevices\\lklvfs"
-#define STR_MAX_LEN     255
 
 #define CHECK_OUT(cond, S)		{if(cond){status=S;goto try_exit;}}
 #define FLAG_ON(flag, val)		((BOOLEAN)((((flag)&(val))!=0)))
@@ -62,7 +59,6 @@ typedef struct irp_context {
 extern PNPAGED_LOOKASIDE_LIST ccb_cachep;
 extern PNPAGED_LOOKASIDE_LIST fcb_cachep;
 extern PNPAGED_LOOKASIDE_LIST irp_context_cachep;
-extern PNPAGED_LOOKASIDE_LIST name_cachep;
 
 typedef struct lkl_fsd {
 	ERESOURCE global_resource;
