@@ -16,43 +16,45 @@ extern int snprintf(char * buf, size_t size, const char * fmt, ...)
 extern int sprintf(char * buf, const char * fmt, ...)
 	__attribute__ ((format (printf, 2, 3)));
 
+static ERESOURCE barier;
 
 NTSTATUS InitializeSysWrappers()
 {
 	// do whatever kind of initialization here
-         
+	ExInitializeResourceLite(&barier);        
 	return STATUS_SUCCESS;
 }
 
 void FreeSysWrapperResources()
 {
 	// free all used resources here
+	ExDeleteResourceLite(&barier);
 }
 
 LONG sys_open_wrapper(PCSTR pathName, INT flags, INT mode)
 {
 	LONG rc;
-     
+        ExAcquireResourceExclusiveLite(&barier,TRUE);
 	rc = sys_open(pathName, flags, mode);
-	
+	RELEASE(&barier);
 	return rc;
 }
 
 LONG sys_close_wrapper(UINT fd)
 {
 	LONG rc;
-	
+	ExAcquireResourceExclusiveLite(&barier,TRUE);
 	rc = sys_close(fd);
-	
+	RELEASE(&barier);
 	return rc;
 }
 
 LONG sys_read_wrapper(UINT fd, IN PVOID buf, ULONG size)
 {
 	LONG rc;
-	
+	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_read(fd, (char*) buf, size);
-	
+	RELEASE(&barier);
 	return rc;
 }
 
@@ -68,36 +70,36 @@ LONG sys_lseek_wrapper(UINT fd, off_t offset, UINT origin)
 LONG sys_newfstat_wrapper(UINT fd, OUT PSTATS stat_buff)
 {
 	LONG rc;
-	
+	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_newfstat(fd, stat_buff);
-	
+	RELEASE(&barier);
 	return rc;
 }
 
 LONG sys_newstat_wrapper(IN PSTR filename,OUT PSTATS statbuf)
 {
 	LONG rc;
-	
+	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_newstat(filename, statbuf);
-	
+	RELEASE(&barier);
 	return rc;
 }
 
 LONG sys_statfs_wrapper(PCSTR path, OUT PSTATFS statfs_buff)
 {
 	LONG rc;
-	
+	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_statfs(path, statfs_buff);
-	
+	RELEASE(&barier);
 	return rc;
 }
 
 LONG sys_getdents_wrapper(UINT fd, OUT PDIRENT dirent, UINT count)
 {
 	LONG rc;
-	
+	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_getdents(fd, dirent, count);
-	
+	RELEASE(&barier);
 	return rc;
 }
 
