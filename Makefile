@@ -8,8 +8,8 @@ LKL_SOURCE=$(HERE)/../linux-2.6
 LKL=lkl/vmlinux
 
 SRCS=$(shell find $(1) -type f -name '*.c')
-OBJS=$(patsubst %.c,%.o,$(call SRCS,$(1))) 
-DEPS=$(patsubst %.c,.deps/%.d,$(call SRCS,$(1))) 
+OBJS=$(patsubst %.c,%.o,$(call SRCS,$(1)))
+DEPS=$(patsubst %.c,.deps/%.d,$(call SRCS,$(1)))
 
 INC=include/asm include/asm-generic include/asm-i386 include/linux include/drivers
 
@@ -52,18 +52,22 @@ lklvfs.sys: $(INC) $(LKLVFS_SRC)
 	i586-mingw32msvc-gcc -Wall -s \
 	$(LKLVFS_SRC) -Wl,--subsystem,native -Wl,--entry,_DriverEntry@8 \
 	-nostartfiles -Llib -lmingw-patch -lntoskrnl -lhal -nostdlib \
-	-shared -o $@ 
+	-shared -o $@
 
-clean: 
-	rm -f lklvfs.sys include/asm include/asm-i386 \
+clean:
+	rm -rf .deps lklvfs.sys
+	rm -f drivers/*.o drivers/.*.o.cmd drivers/built-in.o
+	rm -f src/*.o
+
+clean-all: clean
+	rm -f  include/asm include/asm-i386 \
 	include/asm-generic include/linux $(call OBJS,src) lib/*.a
-	rm -rf .deps lkl
-	rm -f drivers/*.o drivers/.*.o.cmd drivers/built-in.o 
+	rm -f lkl
 
 TAGS: $(call SRCS,src) $(call SRCS,drivers) Makefile include/*.h
 	cd $(LKL_SOURCE) && \
-	$(MAKE) O=$(HERE)/lkl ARCH=lkl CROSS_COMPILE=i586-mingw32msvc- TAGS 
-	etags -f TAGS.tmp $^ 
+	$(MAKE) O=$(HERE)/lkl ARCH=lkl CROSS_COMPILE=i586-mingw32msvc- TAGS
+	etags -f TAGS.tmp $^
 	cat lkl/TAGS TAGS.tmp > TAGS
 	rm TAGS.tmp
 
