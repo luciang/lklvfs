@@ -62,7 +62,7 @@ clean:
 clean-all: clean
 	rm -f  include/asm include/asm-i386 \
 	include/asm-generic include/linux $(call OBJS,src) lib/*.a
-	rm -f lkl
+	rm -fd lkl
 
 TAGS: $(call SRCS,src) $(call SRCS,drivers) Makefile include/*.h
 	cd $(LKL_SOURCE) && \
