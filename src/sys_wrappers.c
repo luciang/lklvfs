@@ -34,27 +34,33 @@ void FreeSysWrapperResources()
 LONG sys_open_wrapper(PCSTR pathName, INT flags, INT mode)
 {
 	LONG rc;
+
         ExAcquireResourceExclusiveLite(&barier,TRUE);
 	rc = sys_open(pathName, flags, mode);
 	RELEASE(&barier);
+
 	return rc;
 }
 
 LONG sys_close_wrapper(UINT fd)
 {
 	LONG rc;
+
 	ExAcquireResourceExclusiveLite(&barier,TRUE);
 	rc = sys_close(fd);
 	RELEASE(&barier);
+
 	return rc;
 }
 
 LONG sys_read_wrapper(UINT fd, IN PVOID buf, ULONG size)
 {
 	LONG rc;
+
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_read(fd, (char*) buf, size);
 	RELEASE(&barier);
+
 	return rc;
 }
 
@@ -62,8 +68,10 @@ LONG sys_lseek_wrapper(UINT fd, off_t offset, UINT origin)
 {
 	LONG rc;
 	
+	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_lseek(fd, offset, origin);
-	
+	RELEASE(&barier);
+
 	return rc;
 }
 
@@ -79,27 +87,33 @@ LONG sys_newfstat_wrapper(UINT fd, OUT PSTATS stat_buff)
 LONG sys_newstat_wrapper(IN PSTR filename,OUT PSTATS statbuf)
 {
 	LONG rc;
+
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_newstat(filename, statbuf);
 	RELEASE(&barier);
+
 	return rc;
 }
 
 LONG sys_statfs_wrapper(PCSTR path, OUT PSTATFS statfs_buff)
 {
 	LONG rc;
+
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_statfs(path, statfs_buff);
 	RELEASE(&barier);
+
 	return rc;
 }
 
 LONG sys_getdents_wrapper(UINT fd, OUT PDIRENT dirent, UINT count)
 {
 	LONG rc;
+
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_getdents(fd, dirent, count);
 	RELEASE(&barier);
+
 	return rc;
 }
 

@@ -10,6 +10,9 @@
 NTSTATUS LklIoctlCompletion(PDEVICE_OBJECT device, PIRP irp, PVOID context);
 NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp);
 
+//
+//	IRP_MJ_DEVICE_CONTROL - is synchronous
+//
 NTSTATUS DDKAPI VfsDeviceControl(PDEVICE_OBJECT device, PIRP irp)
 {
 	NTSTATUS status=STATUS_SUCCESS;
@@ -87,10 +90,10 @@ NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp)
 
 	CHECK_OUT(FLAG_ON(lklfsd.flags, VFS_UNLOAD_PENDING), STATUS_ACCESS_DENIED);
 	CHECK_OUT(!IsListEmpty(&lklfsd.vcb_list), STATUS_ACCESS_DENIED);
-    DbgPrint("Unloading LklVfs");
+    	DbgPrint("Unloading LklVfs");
 	IoUnregisterFileSystem(lklfsd.device);
 	
-    unload_linux_kernel();
+	unload_linux_kernel();
     
 	IoDeleteDevice(lklfsd.device);
      

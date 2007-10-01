@@ -1,14 +1,14 @@
 /**
 * file system control operations
 * TODOs:
-* FIXME (BUG) sys_umount returns EBUSY every time
-* FIXME (BUG) when I open a file, and then unmount the volume it crashes
+* FIXME sys_umount returns EBUSY every time
+* sys_sync behaves weird
 **/
 
 #include <lklvfs.h>
 
 //
-//	IRP_MJ_FILE_SYSTEM_CONTROL
+//	IRP_MJ_FILE_SYSTEM_CONTROL - is synchronous
 //
 NTSTATUS DDKAPI VfsFileSystemControl(PDEVICE_OBJECT device, PIRP irp)
 {
@@ -197,7 +197,8 @@ NTSTATUS DDKAPI VfsLockVolume(PIRP irp, PIO_STACK_LOCATION stack_location)
 	vcb = (PLKLVCB)device->DeviceExtension;
 	ASSERT(vcb);
 
-	// file object - should be the file object for a volume open, even so we accept it for any open file
+	// file object - should be the file object for a volume open, 
+	// even so we accept it for any open file
 	file_obj = stack_location->FileObject;
 	ASSERT(file_obj);
 
@@ -324,7 +325,7 @@ VOID DDKAPI VfsPurgeVolume(PLKLVCB vcb, BOOLEAN flush_before_purge)
 		}
 		ExFreePool(fcb_list_entry);
 	}
-   // sys_sync_wrapper();
+   	//sys_sync_wrapper();
 	VfsReportError("Volume flushed and purged");
 
 	if (vcb_acquired)

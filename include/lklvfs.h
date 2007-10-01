@@ -50,6 +50,7 @@ typedef struct irp_context {
 	UCHAR minor_function;
 	PIRP irp;
 	PDEVICE_OBJECT target_device;
+	PFILE_OBJECT file_object;
 	NTSTATUS saved_exception_code;
 	PIO_WORKITEM work_item;
 

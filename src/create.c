@@ -1,8 +1,8 @@
 /*
 * create /open
 * put all TODOs here:
-* - check file size
-* - set the rest of the flags in the new fcb
+* - check file size - what's the max file size that we support?
+* - set the rest of the flags ( needed for create/move/rename) in the new fcb
 * - create, move, rename file
 */
 
@@ -12,6 +12,10 @@
 NTSTATUS OpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 							  PIO_SECURITY_CONTEXT security_context, PFILE_OBJECT new_file_obj);
 PLKLFCB LocateFcbInCore(PLKLVCB vcb, ULONG inode_no);
+
+//
+// IRP_MJ_CREATE
+//
 
 NTSTATUS DDKAPI VfsCreate(PDEVICE_OBJECT device, PIRP irp)
 {
@@ -99,16 +103,16 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	ASSERT(stack_location);
 
 	// If the caller cannot block, post the request to be handled asynchronously
-	if (! (irp_context->flags & VFS_IRP_CONTEXT_CAN_BLOCK) ) {
+	if (! FLAG_ON(irp_context->flags, VFS_IRP_CONTEXT_CAN_BLOCK) ) {
 		// We must defer processing this request, since create/open is blocking
 		status = LklPostRequest(irp_context,irp);
 		TRY_RETURN(status);
 	}
 
 	// get caller supplied path
-	file = stack_location->FileObject;				// the new file object
-	targetObjectName = file->FileName;				// the name
-	relatedFile = file->RelatedFileObject;			// the related file object
+	file = stack_location->FileObject;	// the new file object
+	targetObjectName = file->FileName;	// the name
+	relatedFile = file->RelatedFileObject;	// the related file object
 
 	if (relatedFile) {
 		ccb = (PLKLCCB)(relatedFile->FsContext2);
@@ -118,7 +122,7 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 		CHECK_OUT(fcb->id.type != FCB && fcb->id.type != VCB, STATUS_INVALID_PARAMETER);
 		relatedObjectName = relatedFile->FileName;
 	}
-	// TODO -- check file size
+	// TODO -- if there is a max file size, then check now
 	// get arguments
 	securityContext = stack_location->Parameters.Create.SecurityContext;
 	desiredAccess = securityContext->DesiredAccess;
@@ -149,7 +153,7 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	if (!file->Vpb) 
 		file->Vpb = vcb->vpb;
 
-	//	acquire resource
+	// acquire resource
 	ExAcquireResourceExclusiveLite(&(vcb->vcb_resource), TRUE);
 	acquiredVcb = TRUE;
 
@@ -172,10 +176,9 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	}
 	CHECK_OUT(openByFileId, STATUS_ACCESS_DENIED);
 	
-	// get absolute path name (?!)
+	// get absolute path name
 	if(relatedFile) {
 		// validity checks ...
-		// check if the related fcb is a directory
 		CHECK_OUT(!FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY), STATUS_INVALID_PARAMETER);
 		CHECK_OUT((relatedObjectName.Length==0) || (relatedObjectName.Buffer[0]!=L'\\'),
 			STATUS_INVALID_PARAMETER);
@@ -203,12 +206,10 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 		absolutePathName.Length = targetObjectName.Length;
 	}
 
-	// for now we allow to open only the root directory
 	if(absolutePathName.Length == 2) {
 		CHECK_OUT(fileOnlyRequested || (requestedDisposition == FILE_SUPERSEDE) ||
 			(requestedDisposition == FILE_OVERWRITE) ||
 			(requestedDisposition == FILE_OVERWRITE_IF), STATUS_FILE_IS_A_DIRECTORY);
-        DbgPrint("ROOT OPEN");
 		status = OpenRootDirectory(vcb, irp, shareAccess, securityContext, file);
 		if(NT_SUCCESS(status))
 			irp->IoStatus.Information = FILE_OPENED;
@@ -220,29 +221,23 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 		TRY_RETURN(STATUS_NOT_IMPLEMENTED);
 	}
 
+	unixPath = VfsCopyUnicodeStringToZcharUnixPath(vcb->linux_device.mnt, 
+                    vcb->linux_device.mnt_length, &absolutePathName, NULL, 0);
+	CHECK_OUT(unixPath == NULL, STATUS_INSUFFICIENT_RESOURCES);
 	// open file
 	if (requestedDisposition == FILE_OPEN) {
-		unixPath =  VfsCopyUnicodeStringToZcharUnixPath(vcb->linux_device.mnt, 
-                    vcb->linux_device.mnt_length, &absolutePathName, NULL, 0);
-		CHECK_OUT(unixPath == NULL, STATUS_INSUFFICIENT_RESOURCES);
 		DbgPrint("Open file %s", unixPath);
-		
 		if (directoryOnlyRequested)
 			fd = sys_open_wrapper(unixPath, O_RDONLY|O_DIRECTORY|O_LARGEFILE, 0666);
 		else
 			fd = sys_open_wrapper(unixPath, O_RDONLY|O_LARGEFILE, 0666);
-		FreeUnixPathString(unixPath);
 		CHECK_OUT((fd<=0), STATUS_OBJECT_PATH_NOT_FOUND);
 	} else {
 		// create and ... ?
-		unixPath =  VfsCopyUnicodeStringToZcharUnixPath(vcb->linux_device.mnt, 
-                    vcb->linux_device.mnt_length, &absolutePathName, NULL, 0);
-		CHECK_OUT(unixPath == NULL, STATUS_INSUFFICIENT_RESOURCES);
 		DbgPrint("Create/overwrite file %s", unixPath);
-		FreeUnixPathString(unixPath);
 		TRY_RETURN(STATUS_NOT_IMPLEMENTED);
 	}
-	
+	FreeUnixPathString(unixPath);
 	// fstat to get inode number, size, etc.
 	rc = sys_newfstat_wrapper(fd, &mystat);
 	CHECK_OUT(rc<0, STATUS_OBJECT_PATH_NOT_FOUND);
@@ -257,8 +252,7 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 		if (!NT_SUCCESS(status))
 			TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
 		VfsCopyUnicodeString(&newFcb->name, &absolutePathName);
-		CHECK_OUT(!absolutePathName.Buffer, STATUS_INSUFFICIENT_RESOURCES);
-
+		CHECK_OUT(!newFcb->name.Buffer, STATUS_INSUFFICIENT_RESOURCES);
 		// complete fcb fields
 		//set all the flags in the fcb structure
 		if (writeThroughRequested)
@@ -284,7 +278,6 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	file->Vpb = vcb->vpb;
 
 	// check access
-	// TODO:  i have a bug here and dunno what it is
 	if (newFcb->handle_count > 0) {
 		status = IoCheckShareAccess(desiredAccess, shareAccess, file, &newFcb->share_access, TRUE);
 		CHECK_OUT(!NT_SUCCESS(status), status);
@@ -396,7 +389,7 @@ NTSTATUS OpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 
 try_exit:
 
-	// if abnormal termination then close on fd
+	// if abnormal termination then close fd
 	if(!NT_SUCCESS(status)) {
 		if (fd > 0)
 			sys_close_wrapper(fd);

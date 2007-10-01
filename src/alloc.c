@@ -213,7 +213,10 @@ PIRPCONTEXT AllocIrpContext(PIRP irp, PDEVICE_OBJECT target_device)
 		irp_context->minor_function = stack_location->MinorFunction;
 
 		if (stack_location->FileObject) {
-			if (IoIsOperationSynchronous(irp))
+			irp_context->file_object = stack_location->FileObject;
+			// never block in close
+			if (IoIsOperationSynchronous(irp) && 
+			stack_location->MajorFunction != IRP_MJ_CLOSE )
 				SET_FLAG(irp_context->flags, VFS_IRP_CONTEXT_CAN_BLOCK);
 
 		} else

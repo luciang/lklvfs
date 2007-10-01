@@ -20,7 +20,6 @@ NTSTATUS DDKAPI VfsCleanup(PDEVICE_OBJECT device, PIRP irp)
 
 	status = CommonCleanup(irp_context, irp);
 
-
 	if (top_level)
 		IoSetTopLevelIrp(NULL);
 
@@ -52,7 +51,7 @@ NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp)
 	stack_location = IoGetCurrentIrpStackLocation(irp);
 	ASSERT(stack_location);
 
-	canWait = ((irp_context->flags & VFS_IRP_CONTEXT_CAN_BLOCK) ? TRUE : FALSE);
+	canWait = FLAG_ON(irp_context->flags, VFS_IRP_CONTEXT_CAN_BLOCK);
 
 	// get vcb resource ex
 	if (!ExAcquireResourceExclusiveLite(&(vcb->vcb_resource), canWait)) {
@@ -66,6 +65,7 @@ NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp)
 	ASSERT(file);
 	fcb = file->FsContext;
 	ASSERT(fcb);
+
 	// clean on volume object
 	if (fcb->id.type == VCB) {
 		if (FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VOLUME_LOCKED)) {
@@ -97,8 +97,8 @@ NTSTATUS CommonCleanup(PIRPCONTEXT irp_context, PIRP irp)
 
 	if (fcb->handle_count == 0) {
 		if (FLAG_ON(fcb->flags, VFS_FCB_DELETE_PENDING)) {
-			DbgPrint("DELETE PENDIND SET IN CLEANUP");
-			//must delete this file ??
+			DbgPrint("DELETE PENDING - delete the file");
+			//must delete this file
 		}
         }
 

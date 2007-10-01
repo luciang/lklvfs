@@ -1,9 +1,13 @@
 /*
 * directory control operations
-* TODO 
+* FIXME: notify request: FsRtlNotifyFullChangeDirectory
 **/
 #include <lklvfs.h>
 #include <linux/stat.h>
+
+//
+// IRP_MJ_DIRECTORY_CONTROL
+//
 
 NTSTATUS DDKAPI VfsDirectoryControl(PDEVICE_OBJECT device, PIRP irp)
 {
@@ -65,14 +69,12 @@ struct dirent_buffer {
 	info->EndOfFile.QuadPart = mystat.st_size;	\
 	info->AllocationSize.QuadPart = mystat.st_blksize * mystat.st_blocks;
 	
-//FiXME: symbolic links are always threated as files, even if they point to a directory
 #define FillFileType \
 	info->FileAttributes = FILE_ATTRIBUTE_NORMAL;	\
 	if (S_ISDIR(mystat.st_mode)) {	\
 		SET_FLAG(info->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);	\
 	}
 
-// FIXME: short name
 #define FillShortName \
 	info->ShortNameLength = (namlen < 12 ? namlen : 12) * 2; \
 	RtlCopyMemory(info->ShortName, file_name.Buffer, info->ShortNameLength); 
@@ -119,15 +121,15 @@ NTSTATUS filldir(struct dirent_buffer * buf, IN PCHAR name, int namlen, ULONG of
 	CharToWchar(file_name.Buffer, (char*)name, namlen);
 
 	// make the full path for stat
-	path = VfsCopyUnicodeStringToZcharUnixPath(fcb->vcb->linux_device.mnt, fcb->vcb->linux_device.mnt_length,
-						   &fcb->name, name, namlen);
+	path = VfsCopyUnicodeStringToZcharUnixPath(fcb->vcb->linux_device.mnt, 
+			fcb->vcb->linux_device.mnt_length, &fcb->name, name, namlen);
            
 	if(!path) {
 		buf->status = STATUS_INSUFFICIENT_RESOURCES;
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
-	DbgPrint("filldir(path='%.255s', offset=%d)\n",
-		 path,(int)offset);
+	//DbgPrint("filldir(path='%.255s', offset=%d)\n",
+	//	 path,(int)offset);
 	ret = sys_newstat_wrapper(path, &mystat);
 	FreeUnixPathString(path);
 	
@@ -200,7 +202,6 @@ NTSTATUS VfsQueryDirectory(PIRPCONTEXT irp_context, PIRP irp,PIO_STACK_LOCATION 
           PFILE_OBJECT file_obj, PLKLFCB fcb, PLKLCCB ccb)
 {
 	NTSTATUS status = STATUS_NOT_IMPLEMENTED;
-	BOOLEAN canWait = FALSE;
 	BOOLEAN restart_scan = FALSE;
 	BOOLEAN index_specified = FALSE;
 	BOOLEAN fcb_resource_acq = FALSE;
@@ -218,9 +219,7 @@ NTSTATUS VfsQueryDirectory(PIRPCONTEXT irp_context, PIRP irp,PIO_STACK_LOCATION 
 	CHECK_OUT(!FLAG_ON(fcb->flags, VFS_FCB_DIRECTORY), STATUS_INVALID_PARAMETER);
    
 	// If the caller cannot block, post the request to be handled asynchronously
-	canWait = FLAG_ON(irp_context->flags, VFS_IRP_CONTEXT_CAN_BLOCK);
-	
-	if (!canWait) {
+	if (!FLAG_ON(irp_context->flags, VFS_IRP_CONTEXT_CAN_BLOCK)) {
 		postRequest = TRUE;
 		TRY_RETURN(STATUS_PENDING);
 	}
@@ -259,7 +258,7 @@ NTSTATUS VfsQueryDirectory(PIRPCONTEXT irp_context, PIRP irp,PIO_STACK_LOCATION 
 	index_specified = stack_location->Flags & SL_INDEX_SPECIFIED;
 	
 	// Acquire the FCB resource; if the caller cannot block, post the request
-	if(!ExAcquireResourceSharedLite(&fcb->fcb_resource, canWait)) {
+	if(!ExAcquireResourceSharedLite(&fcb->fcb_resource, TRUE)) {
 		postRequest = TRUE;
 		TRY_RETURN(STATUS_PENDING);
 	}

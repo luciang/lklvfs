@@ -65,7 +65,6 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 		if (Length < RequiredLength) {
 			irp->IoStatus.Information = sizeof(FILE_FS_VOLUME_INFORMATION);
 			status = STATUS_BUFFER_OVERFLOW;
-			//	DbgPrint("FileFsVolumeInformation");
 			TRY_RETURN(status);
 		}
 		
@@ -90,7 +89,6 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 		Buffer->BytesPerSector = SECTOR_SIZE;
 		irp->IoStatus.Information = sizeof(FILE_FS_SIZE_INFORMATION);
 		status = STATUS_SUCCESS;
-		//	DbgPrint("FileFsSizeInformation");
 		TRY_RETURN(status);
 	}
 	case FileFsDeviceInformation:
@@ -106,7 +104,6 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 		Buffer->Characteristics = vcb->target_device->Characteristics;
 		irp->IoStatus.Information = sizeof(FILE_FS_DEVICE_INFORMATION);
 		status = STATUS_SUCCESS;
-		//	DbgPrint("FileFsDeviceInformation");
 		TRY_RETURN(status);
 	}
 	case FileFsAttributeInformation:
@@ -146,7 +143,6 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 			irp->IoStatus.Information =
 				sizeof(FILE_FS_ATTRIBUTE_INFORMATION);
 			status = STATUS_BUFFER_OVERFLOW;
-			//		DbgPrint("FileFsAttributeInformation");
 			TRY_RETURN(status);
 		}
 		
@@ -170,7 +166,6 @@ NTSTATUS DDKAPI VfsQueryVolumeInformation(PDEVICE_OBJECT device, PIRP irp)
 		Buffer->BytesPerSector = SECTOR_SIZE;
 		irp->IoStatus.Information = sizeof(FILE_FS_FULL_SIZE_INFORMATION);
 		status = STATUS_SUCCESS;
-		//	DbgPrint("FileFsFullSizeInformation");
 		TRY_RETURN(status);
 	}
 	default:

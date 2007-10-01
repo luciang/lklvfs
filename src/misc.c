@@ -155,7 +155,7 @@ PSTR CopyStringAppendULong(PSTR src, USHORT src_length, ULONG number)
 void VfsCopyUnicodeString(PUNICODE_STRING dest, PUNICODE_STRING src)
 {
 	dest->Length = src->Length;
-	dest->MaximumLength = src->MaximumLength = src->Length+2;
+	dest->MaximumLength = src->MaximumLength;
 	dest->Buffer = ExAllocatePoolWithTag(NonPagedPool, dest->MaximumLength, 'RAHC');
 	if(dest->Buffer == NULL)
 		return;
