@@ -121,14 +121,11 @@ NTSTATUS CommonClose(PIRPCONTEXT irp_context, PIRP irp)
 	}
 
 try_exit:
-	if(status == STATUS_SUCCESS)
-		DbgPrint("close request is ok!");     
 	if (resource_acquired)
 		RELEASE(resource_acquired);
 	if (vcbResourceAquired)
 		RELEASE(&vcb->vcb_resource);
 	if (postRequest) {
-		DbgPrint("post close request");
         	//close should not return status pending
 		status = STATUS_SUCCESS;
 		if (irp_context->irp != NULL)
