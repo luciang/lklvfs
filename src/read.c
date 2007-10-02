@@ -123,8 +123,6 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 	CHECK_OUT(ccb->id.type != CCB || ccb->id.size !=sizeof(LKLCCB), STATUS_INVALID_PARAMETER);
 
  	DbgPrint("READ");
-	// BUG! BUG! BUG!
-	TRY_RETURN(STATUS_INVALID_PARAMETER);
 	// Obtain any resources that are appropriate to ensure consistency of data.
 	if (!pagingIo) {
 		ExAcquireResourceSharedLite(&fcb->fcb_resource, TRUE);
@@ -143,7 +141,7 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 		}
 		length = (ULONG)(fcb->common_header.FileSize.QuadPart - byte_offset.QuadPart);
 	}
-	
+	userBuffer = GetUserBuffer(irp);
 	if (!nonBufferedIo) {
 		// If this is a buffered I/O request and caching has not yet been initiated on the
 		// FCB, invoke CcInitializeCacheMap to initiate caching at this time.
@@ -159,7 +157,6 @@ NTSTATUS CommonRead(PIRPCONTEXT irp_context, PIRP irp)
 		} else {
 			// If this is a buffered non-MDL I/O request, forward the request 
 			// on to the NT Cache Manager via an invocation to CcCopyRead
-			userBuffer = GetUserBuffer(irp);
 			CcCopyRead(file, &(byte_offset), length, TRUE, userBuffer, &(irp->IoStatus));
 			// We have the data
 			status = irp->IoStatus.Status;

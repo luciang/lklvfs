@@ -89,7 +89,7 @@ PSTR VfsCopyUnicodeStringToZcharUnixPath(PSTR root_path, USHORT root_path_len,
 	
 	root_path_len = root_path_len + length;
 	
-	if(dest[root_path_len-1] != '/') {
+	if(dest[root_path_len-1] != '/' && name_length != 0) {
 		dest[root_path_len] = '/';
 		root_path_len++;
 	}

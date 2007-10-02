@@ -1,3 +1,6 @@
 Linux Filesystem driver for WINDOWS
 
-
+To build LklVfs you'll need LKL and Mingw.
+To test it you need mount tools by Matt Wu (http://ext2fsd.sourceforge.net/resources/resources.htm)
+or the filedisk tool (http://www.acc.umu.se/~bosse/) if you want to mount a image that contains a Linux filesystem.
+To see a list of bugs ( fixed or not): http://bugs.launchpad.net/lklvfs/

@@ -78,9 +78,11 @@ LONG sys_lseek_wrapper(UINT fd, off_t offset, UINT origin)
 LONG sys_newfstat_wrapper(UINT fd, OUT PSTATS stat_buff)
 {
 	LONG rc;
+
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
 	rc = sys_newfstat(fd, stat_buff);
 	RELEASE(&barier);
+
 	return rc;
 }
 
@@ -230,7 +232,7 @@ LONG sys_unmount_wrapper(PLINDEV ldev)
      if(!ldev)
          return -1;
 
-     rc = sys_umount(ldev->mnt, 0x00000002);
+     rc = sys_umount(ldev->mnt, 0);
      if(rc <0)
            return rc;
 
