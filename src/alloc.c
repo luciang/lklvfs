@@ -45,15 +45,13 @@ VOID CreateVcb(PDEVICE_OBJECT volume_dev, PDEVICE_OBJECT target_dev, PVPB vpb,
 
 VOID FreeVcb(PLKLVCB vcb)
 {
-	LONG rc;
-     
 	if(vcb == NULL)
 		return;
 	if(vcb->id.type != VCB || vcb->id.size !=sizeof(LKLVCB))
 		return;
 	if(!FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VCB_INITIALIZED))
 		return;
-   
+
 	ClearVpbFlag(vcb->vpb, VPB_MOUNTED);
 
 	ExAcquireResourceExclusiveLite(&lklfsd.global_resource, TRUE);
@@ -61,7 +59,7 @@ VOID FreeVcb(PLKLVCB vcb)
 	RELEASE(&lklfsd.global_resource);
 
 	ExDeleteResourceLite(&vcb->vcb_resource);
-   	FsRtlNotifyUninitializeSync(&vcb->notify_irp_mutex);
+	FsRtlNotifyUninitializeSync(&vcb->notify_irp_mutex);
 	
 	//Don't free the device object here: we didn't allocate this object. Let the allocator free it if it finds this suitable.
 	//IoDeleteDevice(vcb->vcb_device);
