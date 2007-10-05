@@ -62,7 +62,9 @@ VOID FreeVcb(PLKLVCB vcb)
 
 	ExDeleteResourceLite(&vcb->vcb_resource);
    	FsRtlNotifyUninitializeSync(&vcb->notify_irp_mutex);
-	IoDeleteDevice(vcb->vcb_device);
+	
+	//Don't free the device object here: we didn't allocate this object. Let the allocator free it if it finds this suitable.
+	//IoDeleteDevice(vcb->vcb_device);
 }
 
 PLKLFCB AllocFcb()
