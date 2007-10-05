@@ -207,6 +207,7 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 	}
 
 	if(absolutePathName.Length == 2) {
+		// open root directory
 		CHECK_OUT(fileOnlyRequested || (requestedDisposition == FILE_SUPERSEDE) ||
 			(requestedDisposition == FILE_OVERWRITE) ||
 			(requestedDisposition == FILE_OVERWRITE_IF), STATUS_FILE_IS_A_DIRECTORY);
@@ -221,6 +222,7 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 		TRY_RETURN(STATUS_NOT_IMPLEMENTED);
 	}
 
+	//unixPath = "/a.c";
 	unixPath = VfsCopyUnicodeStringToZcharUnixPath(vcb->linux_device.mnt, 
                     vcb->linux_device.mnt_length, &absolutePathName, NULL, 0);
 	CHECK_OUT(unixPath == NULL, STATUS_INSUFFICIENT_RESOURCES);
@@ -231,6 +233,7 @@ NTSTATUS CommonCreate(PIRPCONTEXT irp_context, PIRP irp)
 			fd = sys_open_wrapper(unixPath, O_RDONLY|O_DIRECTORY|O_LARGEFILE, 0666);
 		else
 			fd = sys_open_wrapper(unixPath, O_RDONLY|O_LARGEFILE, 0666);
+		//DbgPrint("Open file %s FD RETURNED=%d", unixPath, fd);
 		CHECK_OUT((fd<=0), STATUS_OBJECT_PATH_NOT_FOUND);
 	} else {
 		// create and ... ?

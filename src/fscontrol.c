@@ -59,41 +59,40 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 	PSTR dev_name;
 	STATFS my_stat;
 	ULONG rc;
-    
+
 	CHECK_OUT(dev == lklfsd.device, STATUS_INVALID_DEVICE_REQUEST);
 
 	CHECK_OUT(FLAG_ON(lklfsd.flags, VFS_UNLOAD_PENDING),STATUS_UNRECOGNIZED_VOLUME);
 	
 	DbgPrint("Mount volume");
 
-	// if this succeeds...
 	status = IoCreateDevice(lklfsd.driver, sizeof(LKLVCB), NULL,
-				FILE_DEVICE_DISK_FILE_SYSTEM, 0, FALSE, &volume_device);
+				FILE_DEVICE_DISK_FILE_SYSTEM, 0, FALSE, &volume_device);	
 	CHECK_OUT(!NT_SUCCESS(status), status);
+	
 	if (dev->AlignmentRequirement > volume_device->AlignmentRequirement)
 		volume_device->AlignmentRequirement = dev->AlignmentRequirement;
 	
+	
 	CLEAR_FLAG(volume_device->Flags, DO_DEVICE_INITIALIZING);
-	volume_device->StackSize = (CCHAR)(dev->StackSize+1);
-
+	volume_device->StackSize = (CCHAR)(dev->StackSize+1);	
 	CreateVcb(volume_device,dev,vpb,&AllocationSize);
 	if(!FLAG_ON(((PLKLVCB)volume_device->DeviceExtension)->flags, VFS_VCB_FLAGS_VCB_INITIALIZED))
 		TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
-    
+	
+	
 	// yup, here we read the disk geometry
 	ioctlSize = sizeof(DISK_GEOMETRY);
-	status = BlockDeviceIoControl(dev, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL,
-				      0,
-				      &((PLKLVCB)volume_device->DeviceExtension)->disk_geometry,
-				      &ioctlSize);
+	status = BlockDeviceIoControl(dev, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL, 0,
+				      &((PLKLVCB)volume_device->DeviceExtension)->disk_geometry, &ioctlSize);
 	CHECK_OUT(!NT_SUCCESS(status), status);
 
+	
 	ioctlSize = sizeof(PARTITION_INFORMATION);
-	status = BlockDeviceIoControl(dev, IOCTL_DISK_GET_PARTITION_INFO, NULL,
-				      0,
-				      &((PLKLVCB)volume_device->DeviceExtension)->partition_information,
-				      &ioctlSize);
+	status = BlockDeviceIoControl(dev, IOCTL_DISK_GET_PARTITION_INFO, NULL, 0,
+				      &((PLKLVCB)volume_device->DeviceExtension)->partition_information, &ioctlSize);
 	CHECK_OUT(!NT_SUCCESS(status), status);
+
 	
 	// try a linux mount if this fails, then we fail to mount
 	// the volume
@@ -101,12 +100,14 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 	lklfsd.no_mounts++;
 	vcb = (PLKLVCB) volume_device->DeviceExtension;
 	dev_name = CopyStringAppendULong("device", 6, lklfsd.no_mounts);
-	DbgPrint("Mounting device '%s'", dev_name);
 	status=sys_mount_wrapper(vcb->target_device, dev_name, &vcb->linux_device);
+	DbgPrint("Mounting device '%s' retstatus=%d", dev_name, status);
 	ExFreePool(dev_name);
    	RELEASE(&(lklfsd.global_resource));
 	CHECK_OUT(!NT_SUCCESS(status), status);
 	
+	
+	//get info about the successfully mounted volume
 	rc = sys_statfs_wrapper(vcb->linux_device.mnt, &my_stat);
 
 	vpb->DeviceObject = volume_device;
@@ -116,12 +117,15 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 	vpb->VolumeLabel[sizeof(UNKNOWN_LABEL)] = 0;
 	vpb->VolumeLabelLength = sizeof(UNKNOWN_LABEL)*2;
 	vpb->SerialNumber = my_stat.f_type;
-
 try_exit:
 
 	if(!NT_SUCCESS(status))
 	{
+		ExAcquireResourceExclusiveLite(&(lklfsd.global_resource), TRUE);
 		lklfsd.no_mounts--;
+		RELEASE(&(lklfsd.global_resource));
+		
+		
 		if(volume_device) {
 			FreeVcb((PLKLVCB) volume_device->DeviceExtension);
 			IoDeleteDevice(volume_device);

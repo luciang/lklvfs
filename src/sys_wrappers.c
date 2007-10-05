@@ -179,7 +179,7 @@ LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev)
 	char *mnt;
 	
 	if(!lin_dev)
-        return STATUS_INVALID_PARAMETER;
+	        return STATUS_INVALID_PARAMETER;
 
 	if (lkl_disk_add_disk(wdev, name, lklfsd.no_mounts, &devno, &ldisk)) 
 		goto out_error;
