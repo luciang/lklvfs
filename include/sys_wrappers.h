@@ -4,15 +4,18 @@
 #include <ddk/ntddk.h>
 #undef FASTCALL
 #include <asm/unistd.h>
-#include<asm-generic/statfs.h>
+#include <asm/statfs.h>
+#include <asm/stat.h>
+#include <asm/types.h>
+#include <linux/dirent.h>
 #undef FASTCALL
 
-typedef struct stat           STATS;
-typedef struct stat*          PSTATS;
-typedef struct statfs         STATFS;
-typedef struct statfs*        PSTATFS;
-typedef struct linux_dirent   DIRENT;
-typedef struct linux_dirent*  PDIRENT;
+typedef struct __kernel_stat    STATS;
+typedef struct __kernel_stat*   PSTATS;
+typedef struct __kernel_statfs  STATFS;
+typedef struct __kernel_statfs* PSTATFS;
+typedef struct linux_dirent64   DIRENT;
+typedef struct linux_dirent64*  PDIRENT;
 
 // used to store all the info that we'll need for unmount
 typedef struct lin_dev {
