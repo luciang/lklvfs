@@ -11,28 +11,33 @@ SRCS=$(shell find $(1) -type f -name '*.c')
 OBJS=$(patsubst %.c,%.o,$(call SRCS,$(1)))
 DEPS=$(patsubst %.c,.deps/%.d,$(call SRCS,$(1)))
 
-INC=include/asm include/asm-generic include/asm-i386 include/linux include/drivers
+INC=include/asm include/asm-generic include/x86 include/linux include/drivers
+MKDIR=mkdir -p
 
 all: lklvfs.sys
 
 include/asm:
-	-mkdir `dirname $@`
-	ln -s $(LKL_SOURCE)/include/asm-lkl include/asm
+	-$(MKDIR) `dirname $@` || true
+	ln -s $(LKL_SOURCE)/arch/lkl/include/asm include/asm
 
-include/asm-i386:
-	-mkdir `dirname $@`
-	ln -s $(LKL_SOURCE)/include/asm-i386 include/asm-i386
+include/x86:
+	-$(MKDIR) `dirname $@` || true
+	ln -s $(LKL_SOURCE)/arch/x86 include/x86
 
 include/asm-generic:
-	-mkdir `dirname $@`
+	-$(MKDIR) `dirname $@` || true
 	ln -s $(LKL_SOURCE)/include/asm-generic include/asm-generic
 
 include/linux:
-	-mkdir `dirname $@`
+	-$(MKDIR) `dirname $@` || true
 	ln -s $(LKL_SOURCE)/include/linux include/linux
 
+include/drivers:
+	-$(MKDIR) `dirname $@` || true
+	ln -s $(HERE)/drivers/ include/drivers
+
 lkl/.config: $(LKL_SOURCE)
-	-mkdir `dirname $@`
+	-$(MKDIR) `dirname $@` || true
 	cp $^/arch/lkl/defconfig $@
 
 lkl/vmlinux: lkl/.config $(call SRCS,drivers) drivers/Makefile Makefile
@@ -60,7 +65,7 @@ clean:
 	rm -f src/*.o
 
 clean-all: clean
-	rm -f  include/asm include/asm-i386 \
+	rm -f  include/asm include/x86 \
 	include/asm-generic include/linux $(call OBJS,src) lib/*.a
 	rm -fr lkl
 
@@ -72,7 +77,7 @@ TAGS: $(call SRCS,src) $(call SRCS,drivers) Makefile include/*.h
 	rm TAGS.tmp
 
 .deps/%.d: %.c
-	mkdir -p .deps/$(dir $<)
+	$(MKDIR) .deps/$(dir $<)
 	$(CC) $(CFLAGS) -MM -MT $(patsubst %.c,%.o,$<) $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
