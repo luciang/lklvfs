@@ -19,7 +19,7 @@ int lkl_disk_do_rw(void *f, unsigned long sector, unsigned long nsect,
 
 void* lkl_disk_do_open(const char *filename);
 unsigned long lkl_disk_get_sectors(void*);
-int lkl_disk_add_disk(void *wdev, const char *name, int which, dev_t *devno,
+int lkl_disk_add_disk(void *wdev, const char *name, int which, __kernel_dev_t *devno,
 		      void **gd);
 void lkl_disk_del_disk(void *_gd);
 

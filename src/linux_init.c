@@ -119,7 +119,7 @@ extern int sprintf(char * buf, const char * fmt, ...)
 void linux_main(void)
 {
      KeSetEvent(&good_to_go,IO_NO_INCREMENT , FALSE);
-     sys_mkdir("/mnt", 0700);
+     lkl_sys_mkdir("/mnt", 0700);
      KeWaitForSingleObject(&wait_for_me,  Executive, KernelMode, FALSE, NULL);	
 }
 
@@ -185,7 +185,7 @@ void linux_halt(void)
 }
 
 
-static struct linux_native_operations lnops = {
+static struct lkl_native_operations lnops = {
 	.panic_blink = linux_panic_blink,
 	.mem_init = linux_mem_init,
 	.main = linux_main,

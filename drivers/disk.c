@@ -97,7 +97,7 @@ static int major;
 /*
  * Set up our internal device.
  */
-int lkl_disk_add_disk(void *wdev, const char *name, int which, dev_t *devno, void **gd)
+int lkl_disk_add_disk(void *wdev, const char *name, int which, __kernel_dev_t *devno, void **gd)
 {
 	struct lkl_disk_dev *dev=kmalloc(sizeof(*dev), GFP_KERNEL);
 

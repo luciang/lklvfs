@@ -1,7 +1,7 @@
 /**
 * implement this at your will
 **/
-#include <linux/types.h>
+#include <asm/lkl.h>
 #include <linux/errno.h>
 #include <linux/stat.h>
 #include <asm/unistd.h>
@@ -10,6 +10,7 @@
 #include <linux/fs.h>
 
 #include <lklvfs.h>
+
 
 extern int snprintf(char * buf, size_t size, const char * fmt, ...)
 	__attribute__ ((format (printf, 3, 4)));
@@ -36,7 +37,7 @@ LONG sys_open_wrapper(PCSTR pathName, INT flags, INT mode)
 	LONG rc;
 
         ExAcquireResourceExclusiveLite(&barier,TRUE);
-	rc = sys_open(pathName, flags, mode);
+	rc = lkl_sys_open(pathName, flags, mode);
 	RELEASE(&barier);
 
 	return rc;
@@ -47,7 +48,7 @@ LONG sys_close_wrapper(UINT fd)
 	LONG rc;
 
 	ExAcquireResourceExclusiveLite(&barier,TRUE);
-	rc = sys_close(fd);
+	rc = lkl_sys_close(fd);
 	RELEASE(&barier);
 
 	return rc;
@@ -58,18 +59,18 @@ LONG sys_read_wrapper(UINT fd, IN PVOID buf, ULONG size)
 	LONG rc;
 
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
-	rc = sys_read(fd, (char*) buf, size);
+	rc = lkl_sys_read(fd, (char*) buf, size);
 	RELEASE(&barier);
 
 	return rc;
 }
 
-LONG sys_lseek_wrapper(UINT fd, off_t offset, UINT origin)
+LONG sys_lseek_wrapper(UINT fd, __kernel_off_t offset, UINT origin)
 {
 	LONG rc;
 	
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
-	rc = sys_lseek(fd, offset, origin);
+	rc = lkl_sys_lseek(fd, offset, origin);
 	RELEASE(&barier);
 
 	return rc;
@@ -80,7 +81,7 @@ LONG sys_newfstat_wrapper(UINT fd, OUT PSTATS stat_buff)
 	LONG rc;
 
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
-	rc = sys_newfstat(fd, stat_buff);
+	rc = lkl_sys_newfstat(fd, stat_buff);
 	RELEASE(&barier);
 
 	return rc;
@@ -91,7 +92,7 @@ LONG sys_newstat_wrapper(IN PSTR filename,OUT PSTATS statbuf)
 	LONG rc;
 
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
-	rc = sys_newstat(filename, statbuf);
+	rc = lkl_sys_newstat(filename, statbuf);
 	RELEASE(&barier);
 
 	return rc;
@@ -102,7 +103,7 @@ LONG sys_statfs_wrapper(PCSTR path, OUT PSTATFS statfs_buff)
 	LONG rc;
 
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
-	rc = sys_statfs(path, statfs_buff);
+	rc = lkl_sys_statfs(path, statfs_buff);
 	RELEASE(&barier);
 
 	return rc;
@@ -113,7 +114,7 @@ LONG sys_getdents_wrapper(UINT fd, OUT PDIRENT dirent, UINT count)
 	LONG rc;
 
 	ExAcquireResourceExclusiveLite(&barier, TRUE);
-	rc = sys_getdents(fd, dirent, count);
+	rc = lkl_sys_getdents(fd, dirent, count);
 	RELEASE(&barier);
 
 	return rc;
@@ -174,7 +175,7 @@ out:
 LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev)
 {
 	void *ldisk;
-	dev_t devno;
+	__kernel_dev_t devno;
 	char devno_str[]= { "/dev/xxxxxxxxxxxxxxxx" };
 	char *mnt;
 	
@@ -186,7 +187,7 @@ LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev)
 
 	/* create /dev/dev */
 	snprintf(devno_str, sizeof(devno_str), "/dev/%016x", devno);
-	if (sys_mknod(devno_str, S_IFBLK|0600, devno)) 
+	if (lkl_sys_mknod(devno_str, S_IFBLK|0600, devno)) 
 		goto out_del_disk;
 
 	/* create /mnt/filename */ 
@@ -195,7 +196,7 @@ LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev)
 		goto out_del_dev;
 
 	sprintf(mnt, "/mnt/%s", name);
-	if (sys_mkdir(mnt, 0700))
+	if (lkl_sys_mkdir(mnt, 0700))
 		goto out_free_mnt;
 
 	DbgPrint("Mounting %s in %s", devno_str, mnt);
@@ -212,11 +213,11 @@ LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev)
 	return STATUS_SUCCESS;
 
 out_del_mnt_dir:
-	sys_unlink(mnt);
+	lkl_sys_unlink(mnt);
 out_free_mnt:
 	ExFreePool(mnt);
 out_del_dev:
-	sys_unlink(devno_str);
+	lkl_sys_unlink(devno_str);
 out_del_disk:
 	lkl_disk_del_disk(ldisk);
 out_error:
@@ -232,12 +233,12 @@ LONG sys_unmount_wrapper(PLINDEV ldev)
      if(!ldev)
          return -1;
 
-     rc = sys_umount(ldev->mnt, 0);
+     rc = lkl_sys_umount(ldev->mnt, 0);
      if(rc <0)
            return rc;
 
-     sys_unlink(ldev->mnt);
-     sys_unlink(ldev->devno_str);
+     lkl_sys_unlink(ldev->mnt);
+     lkl_sys_unlink(ldev->devno_str);
      lkl_disk_del_disk(ldev->ldisk);
      
      return rc;
@@ -245,5 +246,5 @@ LONG sys_unmount_wrapper(PLINDEV ldev)
 
 void sys_sync_wrapper()
 {
-     sys_sync();
+     lkl_sys_sync();
 }

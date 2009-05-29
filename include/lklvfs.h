@@ -3,7 +3,7 @@
 
 #include <ddk/ntifs.h>
 #include <ddk/ntdddisk.h>
-
+#include <asm/lkl.h>
 #include <sys_wrappers.h>
 
 #define LKL_FS_NAME             L"\\lklvfs"
