@@ -8,6 +8,7 @@
 
 #include <lklvfs.h>
 #include <linux/stat.h>
+#include <asm/fcntl.h>
 
 NTSTATUS OpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 							  PIO_SECURITY_CONTEXT security_context, PFILE_OBJECT new_file_obj);
@@ -358,7 +359,7 @@ NTSTATUS OpenRootDirectory(PLKLVCB vcb, PIRP irp, USHORT share_access,
 	NTSTATUS status = STATUS_SUCCESS;
 	USHORT root_ino;
 	LONG fd = -1;
-	struct stat mystat;
+	STATS mystat;
     
 	root_ino = 0; 
 	//open root directory
