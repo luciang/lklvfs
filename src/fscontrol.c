@@ -56,6 +56,7 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 	PLKLVCB vcb = NULL;
 	LARGE_INTEGER AllocationSize;
 	ULONG ioctlSize;
+	int sectors;
 	PSTR dev_name;
 	STATFS my_stat;
 	ULONG rc;
@@ -77,30 +78,52 @@ NTSTATUS LklMount(IN PDEVICE_OBJECT dev,IN PVPB vpb)
 	CLEAR_FLAG(volume_device->Flags, DO_DEVICE_INITIALIZING);
 	volume_device->StackSize = (CCHAR)(dev->StackSize+1);	
 	CreateVcb(volume_device,dev,vpb,&AllocationSize);
-	if(!FLAG_ON(((PLKLVCB)volume_device->DeviceExtension)->flags, VFS_VCB_FLAGS_VCB_INITIALIZED))
+	vcb = (PLKLVCB) volume_device->DeviceExtension;
+	if(!FLAG_ON(vcb->flags, VFS_VCB_FLAGS_VCB_INITIALIZED))
 		TRY_RETURN(STATUS_INSUFFICIENT_RESOURCES);
 	
 	
 	// yup, here we read the disk geometry
 	ioctlSize = sizeof(DISK_GEOMETRY);
 	status = BlockDeviceIoControl(dev, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL, 0,
-				      &((PLKLVCB)volume_device->DeviceExtension)->disk_geometry, &ioctlSize);
+				      &vcb->disk_geometry, &ioctlSize);
 	CHECK_OUT(!NT_SUCCESS(status), status);
 
 	
 	ioctlSize = sizeof(PARTITION_INFORMATION);
 	status = BlockDeviceIoControl(dev, IOCTL_DISK_GET_PARTITION_INFO, NULL, 0,
-				      &((PLKLVCB)volume_device->DeviceExtension)->partition_information, &ioctlSize);
+				      &vcb->partition_information, &ioctlSize);
 	CHECK_OUT(!NT_SUCCESS(status), status);
 
+	int bytes_per_sector = 0;
+	switch (vcb->disk_geometry.BytesPerSector)
+	{
+	case 256:
+		bytes_per_sector = 8;
+		break;
+	case 512:
+		bytes_per_sector = 9;
+		break;
+	case 1024:
+		bytes_per_sector = 10;
+		break;
+	case 2048:
+		bytes_per_sector = 11;
+		break;
+	case 4096:
+		bytes_per_sector = 12;
+		break;
+	case 8192:
+		bytes_per_sector = 13;
+		break;
+	}
+	sectors = vcb->partition_information.PartitionLength.QuadPart >> bytes_per_sector;
 	
 	// try a linux mount if this fails, then we fail to mount
 	// the volume
 	ExAcquireResourceExclusiveLite(&(lklfsd.global_resource), TRUE);
 	lklfsd.no_mounts++;
-	vcb = (PLKLVCB) volume_device->DeviceExtension;
-	dev_name = CopyStringAppendULong("device", 6, lklfsd.no_mounts);
-	status=sys_mount_wrapper(vcb->target_device, dev_name, &vcb->linux_device);
+	status = sys_mount_wrapper(vcb->target_device, sectors, &vcb->linux_device);
 	DbgPrint("Mounting device '%s' retstatus=%d", dev_name, status);
 	ExFreePool(dev_name);
    	RELEASE(&(lklfsd.global_resource));
