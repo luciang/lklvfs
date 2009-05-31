@@ -5,7 +5,7 @@
 #include <linux/errno.h>
 #include <linux/stat.h>
 #include <asm/unistd.h>
-#include <drivers/disk.h>
+#include <asm/disk.h>
 #include <sys_wrappers.h>
 #include <linux/fs.h>
 
@@ -155,7 +155,7 @@ static int try_mount(char *devno_str, char *mnt, int flags, void *data)
 retry:
 	for (p = fs_names; *p; p += strlen(p)+1) {
 		DbgPrint("trying %s\n", p);
-		err = sys_safe_mount(devno_str, mnt, p, flags, data);
+		err = lkl_sys_mount(devno_str, mnt, p, flags, data);
 		switch (err) {
 			case 0:
 				goto out;
@@ -172,24 +172,26 @@ out:
 	return err;
 }
 
-LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev)
+LONG sys_mount_wrapper(void *wdev, int sectors, PLINDEV lin_dev)
 {
-	void *ldisk;
 	__kernel_dev_t devno;
 	char devno_str[]= { "/dev/xxxxxxxxxxxxxxxx" };
 	char *mnt;
-	
+	char *name = "sys_mount_wrapper__name_not_initialized";
+
 	if(!lin_dev)
 	        return STATUS_INVALID_PARAMETER;
 
-	if (lkl_disk_add_disk(wdev, name, lklfsd.no_mounts, &devno, &ldisk)) 
+	devno = lkl_disk_add_disk(wdev, sectors);
+	if (devno == 0)
 		goto out_error;
 
 	/* create /dev/dev */
 	snprintf(devno_str, sizeof(devno_str), "/dev/%016x", devno);
-	if (lkl_sys_mknod(devno_str, S_IFBLK|0600, devno)) 
+	if (lkl_sys_mknod(devno_str, S_IFBLK|0600, devno) != 0)
 		goto out_del_disk;
 
+	name = devno_str + strlen("/dev/");
 	/* create /mnt/filename */ 
 	mnt=ExAllocatePool(NonPagedPool, strlen("/mnt/")+strlen(name)+1);
 	if (!mnt)
@@ -203,7 +205,7 @@ LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev)
 	if (try_mount(devno_str, mnt, MS_RDONLY, 0))
 		goto out_del_mnt_dir;
 
-	lin_dev->ldisk = ldisk;
+	lin_dev->devno = devno;
 	lin_dev->mnt_length = strlen(mnt);
 	lin_dev->devno_str_length = sizeof(devno_str);
 	RtlCopyMemory(lin_dev->mnt,mnt, lin_dev->mnt_length); 
@@ -219,7 +221,7 @@ out_free_mnt:
 out_del_dev:
 	lkl_sys_unlink(devno_str);
 out_del_disk:
-	lkl_disk_del_disk(ldisk);
+	lkl_disk_del_disk(devno);
 out_error:
 	DbgPrint("can't mount disk %s\n", name);
 	return STATUS_INVALID_DEVICE_REQUEST;
@@ -239,7 +241,7 @@ LONG sys_unmount_wrapper(PLINDEV ldev)
 
      lkl_sys_unlink(ldev->mnt);
      lkl_sys_unlink(ldev->devno_str);
-     lkl_disk_del_disk(ldev->ldisk);
+     lkl_disk_del_disk(ldev->devno);
      
      return rc;
 }

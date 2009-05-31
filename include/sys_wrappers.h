@@ -20,11 +20,11 @@ typedef struct __kernel_dirent* PDIRENT;
 
 // used to store all the info that we'll need for unmount
 typedef struct lin_dev {
-      UCHAR mnt[255];
-      UCHAR devno_str[255];
+      CHAR mnt[255];
+      CHAR devno_str[255];
       USHORT mnt_length;
       USHORT devno_str_length;
-      PVOID ldisk;
+      __kernel_dev_t devno;
 } LINDEV, *PLINDEV;
 
 NTSTATUS InitializeSysWrappers();
@@ -38,7 +38,7 @@ LONG sys_newfstat_wrapper(UINT fd,OUT PSTATS);
 LONG sys_newstat_wrapper(IN PSTR filename,OUT PSTATS statbuf);
 LONG sys_statfs_wrapper(IN PCSTR path,OUT PSTATFS);
 LONG sys_getdents_wrapper(UINT fd, OUT PDIRENT, UINT count);
-LONG sys_mount_wrapper(void *wdev, const char *name, PLINDEV lin_dev);
+LONG sys_mount_wrapper(void *wdev, int sectors, PLINDEV lin_dev);
 LONG sys_unmount_wrapper(PLINDEV ldev);
 void sys_sync_wrapper();
 
