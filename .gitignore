@@ -10,3 +10,5 @@ lklvfs.sys
 *~
 TAGS
 *.o.cmd
+include/x86
+ntk/
