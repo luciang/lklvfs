@@ -4,8 +4,8 @@
 **/
 
 #include <lklvfs.h>
-#include<fastio.h>
-
+#include <fastio.h>
+#include <asm/env.h>
 
 LKLFSD lklfsd;
 PNPAGED_LOOKASIDE_LIST ccb_cachep;
@@ -24,10 +24,9 @@ NTSTATUS DDKAPI DriverEntry(IN PDRIVER_OBJECT driver,IN PUNICODE_STRING reg_path
 	fcb_cachep = NULL;
 	irp_context_cachep = NULL;
 
-
 	RtlZeroMemory(&lklfsd, sizeof(lklfsd));
 
-	DbgPrint("Loading LklVfs");
+	DbgPrint("Loading LklVfs - compiled at: " __TIME__ " on " __DATE__);
 
 	// fs driver object
 	lklfsd.driver = driver;
@@ -74,10 +73,11 @@ NTSTATUS DDKAPI DriverEntry(IN PDRIVER_OBJECT driver,IN PUNICODE_STRING reg_path
 	RtlInitUnicodeString(&dos_name, LKL_DOS_DEVICE);
 	IoCreateSymbolicLink(&dos_name, &device_name);
 
-	run_linux_kernel();
+	lkl_env_init(64 * 1024 * 1024);
 
 try_exit:
 	if (!NT_SUCCESS(status)) {
+		DbgPrint("LKLVFS load failure");
 		// cleanup
 		FreeSysWrapperResources();
 		
@@ -105,7 +105,6 @@ try_exit:
 
 VOID InitializeFunctionPointers(PDRIVER_OBJECT driver)
 {
-	driver->DriverUnload = DriverUnload;
 	// functions that MUST be supported
 	driver->MajorFunction[IRP_MJ_DEVICE_CONTROL] = VfsDeviceControl;
 	driver->MajorFunction[IRP_MJ_FILE_SYSTEM_CONTROL] = VfsFileSystemControl;
