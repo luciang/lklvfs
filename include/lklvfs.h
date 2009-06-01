@@ -93,8 +93,8 @@ typedef struct lkl_vcb
 	LKLVFSID id; // this tells that i'm a vcb
 	LIST_ENTRY next; // next mounted vcb
 	PVPB vpb; // vpb
-	ULONG open_count; // how many open handles for files in this volume
-	ULONG reference_count; // how many files referenced in this volume
+	LONG open_count; // how many open handles for files in this volume
+	LONG reference_count; // how many files referenced in this volume
 	LIST_ENTRY fcb_list; // head of open files list
 	LIST_ENTRY next_notify_irp; // used for direrctory notification
 	NOTIFY_SYNC notify_irp_mutex;
@@ -138,8 +138,8 @@ typedef struct lkl_fcb {
 	ULONG flags; // flag
 	LIST_ENTRY ccb_list; // head of ccb list
 	SHARE_ACCESS share_access; // share access
-	ULONG reference_count; // references to this fcb
-	ULONG handle_count; // open handles to this file
+	LONG reference_count; // references to this fcb
+	LONG handle_count; // open handles to this file
 	
 	// more fields here
 	UNICODE_STRING name;
