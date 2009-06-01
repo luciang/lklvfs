@@ -7,14 +7,15 @@
 #include <sys_wrappers.h>
 
 #define LKL_FS_NAME             L"\\lklvfs"
-#define LKL_DOS_DEVICE  L"\\DosDevices\\lklvfs"
+#define LKL_DOS_DEVICE          L"\\DosDevices\\lklvfs"
 
-#define CHECK_OUT(cond, S)		{if(cond){status=S;goto try_exit;}}
+#define CHECK_OUT(cond, S)		do { if (cond) {status=S; goto try_exit; } } while(0)
+#define CHECK_OUT_MSG(cond, S, msg)	do { if (cond) {status=S; DbgPrint(msg); goto try_exit; } } while(0)
 #define FLAG_ON(flag, val)		((BOOLEAN)((((flag)&(val))!=0)))
-#define SET_FLAG(flag, val)		((flag)|=(val))
-#define CLEAR_FLAG(flag, val)	((flag)&=~(val))
-#define RELEASE(res) (ExReleaseResourceForThreadLite((res), ExGetCurrentResourceThread()))
-#define TRY_RETURN(S)			{status=S;goto try_exit;}
+#define SET_FLAG(flag, val)		do { (flag) |=  (val); } while (0)
+#define CLEAR_FLAG(flag, val)	        do { (flag) &= ~(val); } while (0)
+#define RELEASE(res)                    do { ExReleaseResourceForThreadLite((res), ExGetCurrentResourceThread()); } while(0)
+#define TRY_RETURN(S)			do { status=S; goto try_exit;} while(0)
 
 #define VFS_UNLOAD_PENDING		0x00000001
 #define	IOCTL_PREPARE_TO_UNLOAD \
