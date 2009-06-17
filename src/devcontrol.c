@@ -89,8 +89,10 @@ NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp)
 	ExAcquireResourceExclusiveLite(&lklfsd.global_resource, TRUE);
 	acq_resource = TRUE;
 
-	CHECK_OUT(FLAG_ON(lklfsd.flags, VFS_UNLOAD_PENDING), STATUS_ACCESS_DENIED);
-	CHECK_OUT(!IsListEmpty(&lklfsd.vcb_list), STATUS_ACCESS_DENIED);
+	CHECK_OUT_MSG(FLAG_ON(lklfsd.flags, VFS_UNLOAD_PENDING), STATUS_ACCESS_DENIED,
+		"Aldready ready to unload");
+	CHECK_OUT_MSG(!IsListEmpty(&lklfsd.vcb_list), STATUS_ACCESS_DENIED,
+		"Mounted volumes exists");
     	DbgPrint("Unloading LklVfs");
 	IoUnregisterFileSystem(lklfsd.device);
 
@@ -98,8 +100,8 @@ NTSTATUS LklPrepareToUnload(PDEVICE_OBJECT device,PIRP irp)
     
 	IoDeleteDevice(lklfsd.device);
      
-	SET_FLAG(lklfsd.flags, VFS_UNLOAD_PENDING);
         lklfsd.driver->DriverUnload = DriverUnload;
+	SET_FLAG(lklfsd.flags, VFS_UNLOAD_PENDING);
 
 try_exit:
 
